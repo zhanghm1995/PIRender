@@ -11,6 +11,8 @@ from tqdm import tqdm
 from PIL import Image
 from scipy.io import loadmat
 from torchvision.transforms import functional as trans_fn
+import torchvision.transforms as T
+
 
 def format_for_lmdb(*args):
     key_parts = []
@@ -28,7 +30,7 @@ class Resizer:
         self.img_format = img_format
 
     def get_resized_bytes(self, img, img_format='jpeg'):
-        img = trans_fn.resize(img, (self.size, self.size), interpolation=Image.BICUBIC)
+        img = trans_fn.resize(img, (self.size, self.size), interpolation=T.InterpolationMode.BICUBIC)
         buf = BytesIO()
         img.save(buf, format=img_format)
         img_bytes = buf.getvalue()

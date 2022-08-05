@@ -68,6 +68,7 @@ def run(data):
     os.environ['CUDA_VISIBLE_DEVICES'] = device
     kp_extractor = KeypointExtractor()
     images = read_video(filename)
+    print(f"{filename} has {len(images)} images")
     name = filename.split('/')[-2:]
     os.makedirs(os.path.join(opt.output_dir, name[-2]), exist_ok=True)
     kp_extractor.extract_keypoint(
