@@ -120,10 +120,10 @@ class Config(AttrDict):
         # Data.
         self.data = AttrDict(name='dummy',
                              type='datasets.images',
-                             num_workers=16)
+                             num_workers=0)
         self.test_data = AttrDict(name='dummy',
                                   type='datasets.images',
-                                  num_workers=16,
+                                  num_workers=0,
                                   test=AttrDict(is_lmdb=False,
                                                 roots='',
                                                 batch_size=1))
