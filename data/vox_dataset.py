@@ -113,15 +113,17 @@ class VoxDataset(Dataset):
     def transform_semantic(self, semantic, frame_index):
         index = self.obtain_seq_index(frame_index, semantic.shape[0])
         coeff_3dmm = semantic[index,...]
-        # id_coeff = coeff_3dmm[:,:80] #identity
+        id_coeff = coeff_3dmm[:,:80] #identity
         ex_coeff = coeff_3dmm[:,80:144] #expression
-        # tex_coeff = coeff_3dmm[:,144:224] #texture
+        tex_coeff = coeff_3dmm[:,144:224] #texture
         angles = coeff_3dmm[:,224:227] #euler angles for pose
-        # gamma = coeff_3dmm[:,227:254] #lighting
+        gamma = coeff_3dmm[:,227:254] #lighting
         translation = coeff_3dmm[:,254:257] #translation
         crop = coeff_3dmm[:,257:260] #crop param
 
-        coeff_3dmm = np.concatenate([ex_coeff, angles, translation, crop], 1)
+        # coeff_3dmm = np.concatenate([ex_coeff, angles, translation, crop], 1)
+        coeff_3dmm = np.concatenate([id_coeff, ex_coeff, tex_coeff, angles, gamma, translation, crop], 1)
+
         return torch.Tensor(coeff_3dmm).permute(1,0)
 
     def obtain_seq_index(self, index, num_frames):
