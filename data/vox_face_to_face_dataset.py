@@ -20,6 +20,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 from visualizer.render_utils import MyMeshRender
+from .face_utils import get_masked_region
 
 
 def rescale_mask_V2(input_mask: np.array, transform_params: list, original_shape: tuple):
@@ -124,29 +125,45 @@ class VoxFace2FaceDataset(Dataset):
 
         person_id = self.person_ids[index]
         video_item = self.video_items[random.choices(self.idx_by_person_id[person_id], k=1)[0]]
-        num_frame = video_item['num_frame']
-
-        frame_idx = random.choice(list(range(num_frame)))
+        frame_source, frame_ref = self.random_select_frames(video_item)
 
         with self.env.begin(write=False) as txn:
-            key = format_for_lmdb(video_item['video_name'], frame_idx)
+            key = format_for_lmdb(video_item['video_name'], frame_source)
             img_bytes_1 = txn.get(key) 
+            key = format_for_lmdb(video_item['video_name'], frame_ref)
+            img_bytes_2 = txn.get(key) 
+
             semantics_key = format_for_lmdb(video_item['video_name'], 'coeff_3dmm')
             semantics_numpy = np.frombuffer(txn.get(semantics_key), dtype=np.float32)
             semantics_numpy = semantics_numpy.reshape((video_item['num_frame'],-1))
-
+        
         img1 = Image.open(BytesIO(img_bytes_1))
         data['source_image'] = self.transform(img1)
-        data['source_semantics'] = self.transform_semantic(semantics_numpy, frame_idx)
+        data['source_semantics'], coeff_3dmm_all = self.transform_semantic(semantics_numpy, frame_source)
+
+        img2 = Image.open(BytesIO(img_bytes_2))
+        data['ref_image'] = self.transform(img2)
 
         ## Get the rendered face image
-        curr_semantics = data['source_semantics'][:, 13:14].permute(1, 0) # (1, 260)
+        curr_semantics = coeff_3dmm_all[:, 13:14].permute(1, 0) # (1, 260)
         curr_face3dmm_params = curr_semantics[:, :257] # (1, 257)
         curr_trans_params = curr_semantics[:, -3:]
 
         rendered_image = self.face_renderer.compute_rendered_face(curr_face3dmm_params, None)
+        # get the rescaled_rendered_image (256, 256, 3)
         rescaled_rendered_image = rescale_mask_V2(rendered_image[0], curr_trans_params[0], original_shape=(256, 256))
         data['rendered_image'] = self.transform(rescaled_rendered_image)
+
+        ## Get the binary mask image from the 3DMM rendered face image
+        rendered_face_mask_img = get_masked_region(np.array(rescaled_rendered_image))[..., None]
+        rendered_face_mask_img_tensor = torch.FloatTensor(rendered_face_mask_img) / 255.0
+        rendered_face_mask_img_tensor = rendered_face_mask_img_tensor.permute(2, 0, 1) # (1, H, W)
+        
+        ## Get the blended face image
+        blended_img_tensor = data['source_image'] * (1 - rendered_face_mask_img_tensor) + \
+                             data['rendered_image'] * rendered_face_mask_img_tensor
+        
+        data['blended_image'] = blended_img_tensor
         return data
     
     def random_select_frames(self, video_item):
@@ -165,10 +182,10 @@ class VoxFace2FaceDataset(Dataset):
         translation = coeff_3dmm[:,254:257] #translation
         crop = coeff_3dmm[:,257:260] #crop param
 
-        # coeff_3dmm = np.concatenate([ex_coeff, angles, translation, crop], 1)
-        coeff_3dmm = np.concatenate([id_coeff, ex_coeff, tex_coeff, angles, gamma, translation, crop], 1)
+        coeff_3dmm = np.concatenate([ex_coeff, angles, translation, crop], 1)
+        coeff_3dmm_complete = np.concatenate([id_coeff, ex_coeff, tex_coeff, angles, gamma, translation, crop], 1)
 
-        return torch.Tensor(coeff_3dmm).permute(1,0)
+        return torch.Tensor(coeff_3dmm).permute(1,0), torch.Tensor(coeff_3dmm_complete).permute(1,0)
 
     def obtain_seq_index(self, index, num_frames):
         seq = list(range(index-self.semantic_radius, index+self.semantic_radius+1))
