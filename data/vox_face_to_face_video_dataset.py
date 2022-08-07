@@ -40,22 +40,29 @@ class VoxFace2FaceVideoDataset(VoxFace2FaceDataset):
         video_item = self.video_items[self.video_index]
         source_video_item = video_item
 
-        num_frams = video_item['num_frame']
+        num_frames = video_item['num_frame']
 
         data = {}
         data['source_image'], data['source_semantics'] = [], []
-        data['blended_image'] = []
+        data['blended_image'], data['reference_image'] = [], []
         with self.env.begin(write=False) as txn:
             semantics_key = format_for_lmdb(video_item['video_name'], 'coeff_3dmm')
             semantics_numpy = np.frombuffer(txn.get(semantics_key), dtype=np.float32)
             semantics_numpy = semantics_numpy.reshape((video_item['num_frame'],-1))
 
-            for frame_index in range(num_frams):
+            for frame_index in range(num_frames):
                 key = format_for_lmdb(video_item['video_name'], frame_index)
                 img_bytes_1 = txn.get(key) 
                 img1 = Image.open(BytesIO(img_bytes_1))
                 source_image = self.transform(img1)
                 data['source_image'].append(source_image)
+
+                reference_frame_idx = random.choice(list(range(num_frames)))
+                key = format_for_lmdb(video_item['video_name'], reference_frame_idx)
+                img_bytes_2 = txn.get(key)
+                img2 = Image.open(BytesIO(img_bytes_2))
+                ref_image = self.transform(img2)
+                data['reference_image'].append(ref_image)
 
                 source_semantics, coeff_3dmm_all = self.transform_semantic(
                     semantics_numpy, frame_index, crop_norm_ratio=None)
