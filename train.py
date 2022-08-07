@@ -1,4 +1,6 @@
 import argparse
+import torch
+from tqdm import tqdm
 
 import data as Dataset
 from config import Config
@@ -35,7 +37,8 @@ if __name__ == '__main__':
         opt.local_rank = args.local_rank
         init_dist(opt.local_rank)    
         opt.device = opt.local_rank
-    
+    opt.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+
     # create a visualizer
     date_uid, logdir = init_logging(opt)
     opt.logdir = logdir
@@ -62,7 +65,7 @@ if __name__ == '__main__':
         if not args.single_gpu:
             train_dataset.sampler.set_epoch(current_epoch)
         trainer.start_of_epoch(current_epoch)
-        for it, data in enumerate(train_dataset):
+        for it, data in tqdm(enumerate(train_dataset), total=len(train_dataset)):
             data = trainer.start_of_iteration(data, current_iteration)
             trainer.optimize_parameters(data)
             current_iteration += 1

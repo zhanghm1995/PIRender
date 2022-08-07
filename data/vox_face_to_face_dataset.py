@@ -142,7 +142,7 @@ class VoxFace2FaceDataset(Dataset):
         data['source_semantics'], coeff_3dmm_all = self.transform_semantic(semantics_numpy, frame_source)
 
         img2 = Image.open(BytesIO(img_bytes_2))
-        data['ref_image'] = self.transform(img2)
+        data['reference_image'] = self.transform(img2)
 
         ## Get the rendered face image
         curr_semantics = coeff_3dmm_all[:, 13:14].permute(1, 0) # (1, 260)
