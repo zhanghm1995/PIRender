@@ -130,7 +130,9 @@ if __name__ == '__main__':
             gen_images = torch.cat(output_images, 0)
             gt_images = torch.cat(gt_images, 0)
             blended_images = torch.stack(blended_image, 0)
+            mask_images = torch.stack(data['masked_image'], 0)
+            rendered_images = torch.stack(data['rendered_image'], 0)
 
-            write2video("{}/{}".format(output_dir, name), blended_images, gen_images, gt_images)
+            write2video("{}/{}".format(output_dir, name), blended_images, rendered_images, mask_images, gen_images, gt_images)
             print("write results to video {}/{}".format(output_dir, name))
 

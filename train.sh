@@ -29,5 +29,5 @@ fi
 
 ${PYTHON} train.py \
 --config ./config/face_to_face.yaml \
---name face_to_face_vox_l1_loss \
+--name face_to_face_vox_l1_loss_new_mask \
 --single_gpu
