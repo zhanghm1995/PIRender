@@ -19,6 +19,7 @@ import torch
 
 from data.vox_dataset import format_for_lmdb
 from data.vox_face_to_face_dataset import VoxFace2FaceDataset
+from .face_utils import get_masked_region, rescale_mask_V2
 
 
 class VoxFace2FaceVideoDataset(VoxFace2FaceDataset):
@@ -43,6 +44,7 @@ class VoxFace2FaceVideoDataset(VoxFace2FaceDataset):
 
         data = {}
         data['source_image'], data['source_semantics'] = [], []
+        data['blended_image'] = []
         with self.env.begin(write=False) as txn:
             semantics_key = format_for_lmdb(video_item['video_name'], 'coeff_3dmm')
             semantics_numpy = np.frombuffer(txn.get(semantics_key), dtype=np.float32)
@@ -52,48 +54,36 @@ class VoxFace2FaceVideoDataset(VoxFace2FaceDataset):
                 key = format_for_lmdb(video_item['video_name'], frame_index)
                 img_bytes_1 = txn.get(key) 
                 img1 = Image.open(BytesIO(img_bytes_1))
-                data['source_image'].append(self.transform(img1))
+                source_image = self.transform(img1)
+                data['source_image'].append(source_image)
 
-                data['source_semantics'].append(
-                    self.transform_semantic(semantics_numpy, frame_index, crop_norm_ratio=None)
-                )
-            data['video_name'] = self.obtain_name(video_item['video_name'], source_video_item['video_name'])
+                source_semantics, coeff_3dmm_all = self.transform_semantic(
+                    semantics_numpy, frame_index, crop_norm_ratio=None)
+
+                data['source_semantics'].append(source_semantics)
+
+                ## Get the rendered face image
+                curr_semantics = coeff_3dmm_all[:, 13:14].permute(1, 0) # (1, 260)
+                curr_face3dmm_params = curr_semantics[:, :257] # (1, 257)
+                curr_trans_params = curr_semantics[:, -3:]
+
+                rendered_image = self.face_renderer.compute_rendered_face(curr_face3dmm_params, None)
+                # get the rescaled_rendered_image (256, 256, 3)
+                rescaled_rendered_image = rescale_mask_V2(rendered_image[0], curr_trans_params[0], original_shape=(256, 256))
+                rendered_image = self.transform(rescaled_rendered_image)
+
+                ## Get the binary mask image from the 3DMM rendered face image
+                rendered_face_mask_img = get_masked_region(np.array(rescaled_rendered_image))[..., None]
+                rendered_face_mask_img_tensor = torch.FloatTensor(rendered_face_mask_img) / 255.0
+                rendered_face_mask_img_tensor = rendered_face_mask_img_tensor.permute(2, 0, 1) # (1, H, W)
+                
+                ## Get the blended face image
+                blended_img_tensor = source_image * (1 - rendered_face_mask_img_tensor) + \
+                                     rendered_image * rendered_face_mask_img_tensor
+                data['blended_image'].append(blended_img_tensor)
+            
+        data['video_name'] = self.obtain_name(video_item['video_name'], source_video_item['video_name'])
         return data
-
-    def load_next_video_old(self):
-        data={}
-        self.video_index += 1
-        video_item = self.video_items[self.video_index]
-        source_video_item = self.random_video(video_item) if self.cross_id else video_item 
-
-        with self.env.begin(write=False) as txn:
-            key = format_for_lmdb(source_video_item['video_name'], 0)
-            img_bytes_1 = txn.get(key) 
-            img1 = Image.open(BytesIO(img_bytes_1))
-            data['source_image'] = self.transform(img1)
-
-            semantics_key = format_for_lmdb(video_item['video_name'], 'coeff_3dmm')
-            semantics_numpy = np.frombuffer(txn.get(semantics_key), dtype=np.float32)
-            semantics_numpy = semantics_numpy.reshape((video_item['num_frame'],-1))
-            if self.cross_id and self.norm_crop_param:
-                semantics_source_key = format_for_lmdb(source_video_item['video_name'], 'coeff_3dmm')
-                semantics_source_numpy = np.frombuffer(txn.get(semantics_source_key), dtype=np.float32)
-                semantic_source_numpy = semantics_source_numpy.reshape((source_video_item['num_frame'],-1))[0:1]
-                crop_norm_ratio = self.find_crop_norm_ratio(semantic_source_numpy, semantics_numpy)
-            else:
-                crop_norm_ratio = None            
-
-            data['target_image'], data['target_semantics'] = [], []
-            for frame_index in range(video_item['num_frame']):
-                key = format_for_lmdb(video_item['video_name'], frame_index)
-                img_bytes_1 = txn.get(key) 
-                img1 = Image.open(BytesIO(img_bytes_1))
-                data['target_image'].append(self.transform(img1))
-                data['target_semantics'].append(
-                    self.transform_semantic(semantics_numpy, frame_index, crop_norm_ratio)
-                )
-            data['video_name'] = self.obtain_name(video_item['video_name'], source_video_item['video_name'])
-        return data  
     
     def random_video(self, target_video_item):
         target_person_id = target_video_item['person_id']
@@ -116,11 +106,11 @@ class VoxFace2FaceVideoDataset(VoxFace2FaceDataset):
     def transform_semantic(self, semantic, frame_index, crop_norm_ratio):
         index = self.obtain_seq_index(frame_index, semantic.shape[0])
         coeff_3dmm = semantic[index,...]
-        # id_coeff = coeff_3dmm[:,:80] #identity
+        id_coeff = coeff_3dmm[:,:80] #identity
         ex_coeff = coeff_3dmm[:,80:144] #expression
-        # tex_coeff = coeff_3dmm[:,144:224] #texture
+        tex_coeff = coeff_3dmm[:,144:224] #texture
         angles = coeff_3dmm[:,224:227] #euler angles for pose
-        # gamma = coeff_3dmm[:,227:254] #lighting
+        gamma = coeff_3dmm[:,227:254] #lighting
         translation = coeff_3dmm[:,254:257] #translation
         crop = coeff_3dmm[:,257:300] #crop param
 
@@ -128,7 +118,8 @@ class VoxFace2FaceVideoDataset(VoxFace2FaceDataset):
             crop[:, -3] = crop[:, -3] * crop_norm_ratio
 
         coeff_3dmm = np.concatenate([ex_coeff, angles, translation, crop], 1)
-        return torch.Tensor(coeff_3dmm).permute(1,0)   
+        coeff_3dmm_all = np.concatenate([id_coeff, ex_coeff, tex_coeff, angles, gamma, translation, crop], 1)
+        return torch.Tensor(coeff_3dmm).permute(1,0), torch.Tensor(coeff_3dmm_all).permute(1,0)
 
     def obtain_name(self, target_name, source_name):
         if not self.cross_id:

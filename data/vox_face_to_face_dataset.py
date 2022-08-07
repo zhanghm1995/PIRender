@@ -20,32 +20,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 from visualizer.render_utils import MyMeshRender
-from .face_utils import get_masked_region
-
-
-def rescale_mask_V2(input_mask: np.array, transform_params: list, original_shape: tuple):
-    """
-    Uncrops and rescales (i.e., resizes) the given scaled and cropped mask back to the
-    resolution of the original image using the given transformation parameters.
-    """
-    original_image_width, original_image_height = original_shape
-    s = np.float64(transform_params[0])
-    t = transform_params[1:]
-    target_size = 224.0
-
-    scaled_image_w = (original_image_width * s).astype(np.int32)
-    scaled_image_h = (original_image_height * s).astype(np.int32)
-    left = (scaled_image_w/2 - target_size/2 + float((t[0] - original_image_width/2)*s)).astype(np.int32)
-    up = (scaled_image_h/2 - target_size/2 + float((original_image_height/2 - t[1])*s)).astype(np.int32)
-
-    # Parse transform params.
-    mask_scaled = Image.new('RGB', (scaled_image_w, scaled_image_h), (0, 0, 0))
-    mask_scaled.paste(Image.fromarray(input_mask), (left, up))
-    
-    # Rescale the uncropped mask back to the resolution of the original image.
-    uncropped_and_rescaled_mask = mask_scaled.resize((original_image_width, original_image_height), 
-                                                      resample=Image.Resampling.BICUBIC)
-    return uncropped_and_rescaled_mask
+from .face_utils import get_masked_region, rescale_mask_V2
 
 
 def format_for_lmdb(*args):
