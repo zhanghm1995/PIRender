@@ -62,3 +62,29 @@ def rescale_mask_V2(input_mask: np.array, transform_params: list, original_shape
     uncropped_and_rescaled_mask = mask_scaled.resize((original_image_width, original_image_height), 
                                                       resample=Image.Resampling.BICUBIC)
     return uncropped_and_rescaled_mask
+
+
+def get_coeff_vector(face_params_dict, key_list=None, reset_list=None):
+    """Get coefficient vector from Deep3DFace_Pytorch results
+
+    Args:
+        face_params_dict (dict): the dictionary contains reconstructed 3D face
+
+    Returns:
+        [np.ndarray]: 1x257
+    """
+    if key_list is None:
+        keys_list = ['id', 'exp', 'tex', 'angle', 'gamma', 'trans']
+    else:
+        keys_list = key_list
+
+    coeff_list = []
+    for key in keys_list:
+        if reset_list is not None and key in reset_list:
+            value = np.zeros_like(face_params_dict[key])
+            coeff_list.append(value)
+        else:
+            coeff_list.append(face_params_dict[key])
+    
+    coeff_res = np.concatenate(coeff_list, axis=1)
+    return coeff_res

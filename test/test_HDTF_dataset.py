@@ -31,7 +31,10 @@ def test_HDTFDataset():
     dataset = HDTFDataset(opt)
     print(len(dataset))
 
-    item = dataset[0]
+    element = dataset[5]
+
+    for key, value in element.items():
+        print(key, value.shape)
 
 
 if __name__ == "__main__":
