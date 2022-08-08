@@ -109,6 +109,7 @@ class HDTFDataset(Dataset):
         curr_face3dmm_params = curr_semantics[:, :257] # (1, 257)
         curr_trans_params = curr_semantics[:, -3:]
 
+
         rendered_image_numpy, mask = self.face_renderer.compute_rendered_face(curr_face3dmm_params, None)
         # get the rescaled_rendered_image (256, 256, 3)
         rescaled_rendered_image = rescale_mask_V2(rendered_image_numpy[0], curr_trans_params[0], original_shape=(512, 512))
@@ -117,7 +118,8 @@ class HDTFDataset(Dataset):
         ## get the rescaled mask image
         mask = mask.permute(0, 2, 3, 1).cpu().numpy() * 255 # (B, 224, 224, 1)
         mask = mask.astype(np.uint8)
-        rescaled_mask_image = rescale_mask_V2(mask[0], curr_trans_params[0], original_shape=(256, 256))
+        rescaled_mask_image = rescale_mask_V2(mask[0], curr_trans_params[0], original_shape=(512, 512))
+        rescaled_mask_image = rescaled_mask_image.resize((256, 256))
         rescaled_mask_image = get_contour(np.array(rescaled_mask_image)[..., 0].astype(np.uint8))
         rendered_face_mask_img_tensor = torch.FloatTensor(np.array(rescaled_mask_image)) / 255.0
         rendered_face_mask_img_tensor = rendered_face_mask_img_tensor[..., None].permute(2, 0, 1) # (1, H, W)
