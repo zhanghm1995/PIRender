@@ -72,7 +72,7 @@ data:
 
 data_demo:
     type: data.vox_face_to_face_video_dataset::VoxFace2FaceVideoDataset
-    path: ./dataset/vox_lmdb_demo
+    path: ./dataset/vox_lmdb
     resolution: 256
     semantic_radius: 13
     train:
