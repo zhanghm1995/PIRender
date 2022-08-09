@@ -25,6 +25,7 @@ from util.distributed import init_dist
 from util.trainer import get_model_optimizer_and_scheduler, set_random_seed, get_trainer
 from util.distributed import master_only_print as print
 from data.vox_face_to_face_video_dataset import VoxFace2FaceVideoDataset
+from data.HDTF_video_dataset import HDTFVideoDataset
 from config import Config
 
 
@@ -102,7 +103,7 @@ if __name__ == '__main__':
         )
     os.makedirs(output_dir, exist_ok=True)
     opt.data.cross_id = args.cross_id
-    dataset = VoxFace2FaceVideoDataset(opt.data_demo, is_inference=True)
+    dataset = HDTFVideoDataset(opt.data_demo, is_inference=True)
     
     with torch.no_grad():
         for video_index in range(dataset.__len__()):

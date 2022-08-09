@@ -19,6 +19,7 @@ import cv2
 import torch
 from torch.nn import functional as F
 import torchvision.transforms as transforms
+from collections import defaultdict
 
 from data.vox_dataset import format_for_lmdb
 from data.HDTF_dataset import HDTFDataset
@@ -46,8 +47,6 @@ class HDTFVideoDataset(HDTFDataset):
         return len(self.video_name_to_imgs_list_dict)
 
     def load_next_video(self):
-        data = {}
-
         self.video_index += 1
         
         video_name = self.all_videos_dir[self.video_index]
@@ -55,16 +54,18 @@ class HDTFVideoDataset(HDTFDataset):
 
         start_index = random.choice(range(num_frames - self.fetch_length))
 
+        data = defaultdict(list)
         for frame_index in range(start_index, start_index + self.fetch_length):
             ## Read the source image and source semantics
             source_img_path = osp.join(self.data_root, video_name, "face_image", f"{frame_index:06d}.jpg")
             source_image = Image.open(source_img_path).convert("RGB")
-            data['source_image'] = self.transform(source_image)
+            source_image = self.transform(source_image)
+            data['source_image'].append(source_image)
 
             ref_img_idx = 0
             ref_img_path = osp.join(self.data_root, video_name, "face_image", f"{ref_img_idx:06d}.jpg")
             reference_image = Image.open(ref_img_path).convert("RGB")
-            data['reference_image'] = self.transform(reference_image)
+            data['reference_image'].append(self.transform(reference_image))
 
             ## Get the 3DMM rendered face image
             index_seq_window = self.get_index_seq_window(frame_index, num_frames)
@@ -78,7 +79,7 @@ class HDTFVideoDataset(HDTFDataset):
 
             coeff_3dmm_all_tensor = torch.Tensor(np.concatenate(coeff_3dmm_list, axis=0)).permute(1,0)
             source_semantics = torch.Tensor(np.concatenate(semantic_params_list, axis=0)).permute(1,0)
-            data['source_semantics'] = source_semantics
+            data['source_semantics'].append(source_semantics)
 
                 ## Get the rendered face image
             curr_semantics = coeff_3dmm_all_tensor[:, 13:14].permute(1, 0) # (1, 260)
@@ -88,7 +89,8 @@ class HDTFVideoDataset(HDTFDataset):
             rendered_image_numpy, mask = self.face_renderer.compute_rendered_face(curr_face3dmm_params, None)
             # get the rescaled_rendered_image (256, 256, 3)
             rescaled_rendered_image = rescale_mask_V2(rendered_image_numpy[0], curr_trans_params[0], original_shape=(512, 512))
-            data['rendered_image'] = self.transform(rescaled_rendered_image)
+            rescaled_rendered_image = self.transform(rescaled_rendered_image)
+            data['rendered_image'].append(rescaled_rendered_image)
 
             ## get the rescaled mask image
             mask = mask.permute(0, 2, 3, 1).cpu().numpy() * 255 # (B, 224, 224, 1)
@@ -102,13 +104,16 @@ class HDTFVideoDataset(HDTFDataset):
             rendered_face_mask_img_tensor = rendered_face_mask_img_tensor[..., None].permute(2, 0, 1) # (1, H, W)
             
             ## Get the blended face image
-            blended_img_tensor = data['source_image'] * (1 - rendered_face_mask_img_tensor) + \
-                                 data['rendered_image'] * rendered_face_mask_img_tensor
+            blended_img_tensor = source_image * (1 - rendered_face_mask_img_tensor) + \
+                                 rescaled_rendered_image * rendered_face_mask_img_tensor
             
-            data['blended_image'] = blended_img_tensor
-            
-        data['video_name'] = self.obtain_name(video_name, video_name)
-        return data
+            data['blended_image'].append(blended_img_tensor)
+            data['masked_image'].append(rendered_face_mask_img_tensor.repeat(3, 1, 1))
+        
+        data_output = {}
+        data_output['video_name'] = self.obtain_name(video_name, video_name)
+        data_output.update(data)
+        return data_output
     
     def random_video(self, target_video_item):
         target_person_id = target_video_item['person_id']

@@ -73,8 +73,10 @@ data:
       distributed: False
 
 data_demo:
-    type: data.vox_face_to_face_video_dataset::VoxFace2FaceVideoDataset
-    path: ./dataset/vox_lmdb
+    type: data.HDTF_video_dataset::HDTFVideoDataset
+    data_root: ./dataset/HDTF_face3dmmformer
+    split: ./dataset/train_HDTF_face3dmmformer.txt
+    statistics_file: ./dataset/HDTF_face3dmmformer_statistics.txt
     resolution: 256
     semantic_radius: 13
     train:

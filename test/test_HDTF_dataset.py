@@ -59,6 +59,8 @@ def test_HDTFVideoDataset():
     element = dataset.load_next_video()
     print(element.keys())
 
+    print(element['source_semantics'].shape)
+
 
 if __name__ == "__main__":
     test_HDTFVideoDataset()
