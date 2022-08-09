@@ -44,7 +44,22 @@ def test_HDTFDataset():
     torchvision.utils.save_image(vis_images, "hdtf_test.jpg", padding=0)
     
 
+def test_HDTFVideoDataset():
+    from data.HDTF_video_dataset import HDTFVideoDataset
+
+    opt = EasyDict()
+    opt.data_root = "./dataset/HDTF_face3dmmformer"
+    opt.semantic_radius = 13
+    opt.split = "./dataset/train_HDTF_face3dmmformer.txt"
+    opt.statistics_file = "./dataset/HDTF_face3dmmformer_statistics.txt"
+
+    dataset = HDTFVideoDataset(opt, is_inference=True)
+    print(len(dataset))
+
+    element = dataset.load_next_video()
+    print(element.keys())
+
+
 if __name__ == "__main__":
-    test_HDTFDataset()
+    test_HDTFVideoDataset()
     print("Done")
-    pass

@@ -28,7 +28,9 @@ from .face_utils import get_masked_region, rescale_mask_V2, get_contour
 class HDTFVideoDataset(HDTFDataset):
     def __init__(self, opt, is_inference):
         super(HDTFVideoDataset, self).__init__(opt, is_inference)
+        
         self.video_index = -1
+        
         self.cross_id = False
         # whether normalize the crop parameters when performing cross_id reenactments
         # set it as "True" always brings better performance
@@ -41,7 +43,7 @@ class HDTFVideoDataset(HDTFDataset):
         self.fetch_length = 200
 
     def __len__(self):
-        return len(self.self.video_name_to_imgs_list_dict)
+        return len(self.video_name_to_imgs_list_dict)
 
     def load_next_video(self):
         data = {}
@@ -55,12 +57,13 @@ class HDTFVideoDataset(HDTFDataset):
 
         for frame_index in range(start_index, start_index + self.fetch_length):
             ## Read the source image and source semantics
-            source_img_path = osp.join(self.data_root, video_name, f"{frame_index:06d}.jpg")
+            source_img_path = osp.join(self.data_root, video_name, "face_image", f"{frame_index:06d}.jpg")
             source_image = Image.open(source_img_path).convert("RGB")
             data['source_image'] = self.transform(source_image)
 
             ref_img_idx = 0
-            reference_image = Image.open(osp.join(self.data_root, video_name, f"{ref_img_idx:06d}.jpg")).convert("RGB")
+            ref_img_path = osp.join(self.data_root, video_name, "face_image", f"{ref_img_idx:06d}.jpg")
+            reference_image = Image.open(ref_img_path).convert("RGB")
             data['reference_image'] = self.transform(reference_image)
 
             ## Get the 3DMM rendered face image
@@ -100,7 +103,7 @@ class HDTFVideoDataset(HDTFDataset):
             
             ## Get the blended face image
             blended_img_tensor = data['source_image'] * (1 - rendered_face_mask_img_tensor) + \
-                                data['rendered_image'] * rendered_face_mask_img_tensor
+                                 data['rendered_image'] * rendered_face_mask_img_tensor
             
             data['blended_image'] = blended_img_tensor
             
