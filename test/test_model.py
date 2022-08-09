@@ -36,15 +36,14 @@ def parse_args():
     return args
 
 
-# net = Face2FaceGenerator()
-
 args = parse_args()
 opt = Config(args.config, args=args, is_train=True)
 
 net_G = Face2FaceGenerator(**opt.gen.param)
 
-input_image = torch.randn(1, 3, 512, 512)
-rendered_image = torch.randn(1, 3, 512, 512)
+image_size = 256
+input_image = torch.randn(1, 3, image_size, image_size)
+rendered_image = torch.randn(1, 3, image_size, image_size)
 driving_source = torch.randn(1, 73, 27)
 
 output = net_G(input_image, rendered_image, driving_source)
