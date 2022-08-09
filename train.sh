@@ -35,5 +35,5 @@ fi
 ## For training HDTF #####
 ${PYTHON} train.py \
 --config ./config/face_to_face_HDTF.yaml \
---name HDTF_face_to_face \
+--name HDTF_face_to_face_no_adain \
 --single_gpu

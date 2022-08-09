@@ -222,7 +222,7 @@ class FineDecoder(nn.Module):
             in_channels = min(ngf*(2**(i+1)), img_f)
             out_channels = min(ngf*(2**i), img_f)
             up = UpBlock2d(in_channels, out_channels, norm_layer, nonlinearity, use_spect)
-            res = FineADAINResBlocks(num_block, in_channels, feature_nc, norm_layer, nonlinearity, use_spect, use_addin=False)
+            res = FineADAINResBlocks(num_block, in_channels, feature_nc, norm_layer, nonlinearity, use_spect, use_adain=False)
             jump = Jump(out_channels, norm_layer, nonlinearity, use_spect)
 
             setattr(self, 'up' + str(i), up)
@@ -299,22 +299,23 @@ class UpBlock2d(nn.Module):
 class FineADAINResBlocks(nn.Module):
     def __init__(self, num_block, input_nc, feature_nc, 
                  norm_layer=nn.BatchNorm2d, nonlinearity=nn.LeakyReLU(), use_spect=False,
-                 use_addin=True):
+                 use_adain=True):
         super(FineADAINResBlocks, self).__init__()
-        self.use_addin = use_addin
+        self.use_adain = use_adain
 
         self.num_block = num_block
         for i in range(num_block):
-            if use_addin:
+            if use_adain:
                 model = FineADAINResBlock2d(input_nc, feature_nc, norm_layer, nonlinearity, use_spect)
             else:
-                kwargs = {'kernel_size': 7, 'stride': 1, 'padding': 3}
+                kwargs = {'kernel_size': 3, 'stride': 1, 'padding': 1}
                 conv = spectral_norm(nn.Conv2d(input_nc, input_nc, **kwargs), use_spect)
-                model = nn.Sequential(conv, norm_layer(input_nc), nonlinearity)
+                # model = nn.Sequential(conv, norm_layer(input_nc), nonlinearity)
+                model = conv
             setattr(self, 'res'+str(i), model)
 
     def forward(self, x, z):
-        if self.use_addin:
+        if self.use_adain:
             for i in range(self.num_block):
                 model = getattr(self, 'res'+str(i))
                 x = model(x, z)
