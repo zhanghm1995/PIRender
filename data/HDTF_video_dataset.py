@@ -54,6 +54,11 @@ class HDTFVideoDataset(HDTFDataset):
 
         start_index = random.choice(range(num_frames - self.fetch_length))
 
+        if self.use_cross_expression:
+            cross_video_name = random.choice(self.all_videos_dir)
+            cross_video_num_frames = self.video_frame_length_dict[cross_video_name]
+            cross_start_index = random.choice(range(cross_video_num_frames - self.fetch_length))
+
         data = defaultdict(list)
         for frame_index in range(start_index, start_index + self.fetch_length):
             ## Read the source image and source semantics
@@ -68,18 +73,26 @@ class HDTFVideoDataset(HDTFDataset):
             data['reference_image'].append(self.transform(reference_image))
 
             ## Get the 3DMM rendered face image
-            index_seq_window = self.get_index_seq_window(frame_index, num_frames)
+            if not self.use_cross_expression:
+                index_seq_window = self.get_index_seq_window(frame_index, num_frames)
 
-            coeff_3dmm_list, semantic_params_list = [], []
-            for i in index_seq_window:
-                mat_fp = osp.join(self.data_root, video_name, "deep3dface", f"{i:06d}.mat")
-                semantic_params, coeff_3dmm_all = self.read_face3dmm_params(mat_fp)
-                coeff_3dmm_list.append(coeff_3dmm_all)
-                semantic_params_list.append(semantic_params)
+                coeff_3dmm_list, semantic_params_list = [], []
+                for i in index_seq_window:
+                    mat_fp = osp.join(self.data_root, video_name, "deep3dface", f"{i:06d}.mat")
+                    semantic_params, coeff_3dmm_all = self.read_face3dmm_params(mat_fp)
+                    coeff_3dmm_list.append(coeff_3dmm_all)
+                    semantic_params_list.append(semantic_params)
+            else:
+                semantic_params_list, coeff_3dmm_list = \
+                    self.load_face3dmm_coeffs(video_name, frame_index, num_frames, use_cross_expression=True,
+                                              cross_video_name=cross_video_name, cross_frame_index=cross_start_index,
+                                              cross_video_num_frames=cross_video_num_frames)
+                cross_start_index += 1
 
-            coeff_3dmm_all_tensor = torch.Tensor(np.concatenate(coeff_3dmm_list, axis=0)).permute(1,0)
             source_semantics = torch.Tensor(np.concatenate(semantic_params_list, axis=0)).permute(1,0)
             data['source_semantics'].append(source_semantics)
+
+            coeff_3dmm_all_tensor = torch.Tensor(np.concatenate(coeff_3dmm_list, axis=0)).permute(1,0)
 
                 ## Get the rendered face image
             curr_semantics = coeff_3dmm_all_tensor[:, 13:14].permute(1, 0) # (1, 260)
@@ -115,6 +128,39 @@ class HDTFVideoDataset(HDTFDataset):
         data_output.update(data)
         return data_output
     
+    def load_face3dmm_coeffs(self, video_name, frame_index, num_frames, 
+                             use_cross_expression=False, cross_video_name=None, 
+                             cross_frame_index=None, cross_video_num_frames=None):
+        ## Get the 3DMM rendered face image
+        index_seq_window = self.get_index_seq_window(frame_index, num_frames)
+
+        if not use_cross_expression:
+            coeff_3dmm_list, semantic_params_list = [], []
+            for i in index_seq_window:
+                mat_fp = osp.join(self.data_root, video_name, "deep3dface", f"{i:06d}.mat")
+                semantic_params, coeff_3dmm_all = self.read_face3dmm_params(mat_fp)
+                semantic_params_list.append(semantic_params)
+                coeff_3dmm_list.append(coeff_3dmm_all)
+        else:
+            assert cross_video_name is not None and cross_frame_index is not None
+            cross_index_seq_window = self.get_index_seq_window(cross_frame_index, cross_video_num_frames)
+
+            coeff_3dmm_list, semantic_params_list = [], []
+            for i, j in zip(index_seq_window, cross_index_seq_window):
+                mat_fp = osp.join(self.data_root, video_name, "deep3dface", f"{i:06d}.mat")
+                semantic_params, coeff_3dmm_all = self.read_face3dmm_params(mat_fp)
+
+                cross_mat_fp = osp.join(self.data_root, cross_video_name, "deep3dface", f"{j:06d}.mat")
+                cross_semantic_params, cross_coeff_3dmm_all = self.read_face3dmm_params(cross_mat_fp)
+
+                semantic_params[:, :64] = cross_semantic_params[:, :64]
+                coeff_3dmm_all[:, 80:144] = cross_coeff_3dmm_all[:, 80:144]
+
+                semantic_params_list.append(semantic_params)
+                coeff_3dmm_list.append(coeff_3dmm_all)
+            
+        return semantic_params_list, coeff_3dmm_list
+
     def random_video(self, target_video_item):
         target_person_id = target_video_item['person_id']
         assert len(self.person_ids) > 1 
@@ -124,32 +170,6 @@ class HDTFVideoDataset(HDTFDataset):
         source_video_index = np.random.choice(self.idx_by_person_id[source_person_id])
         source_video_item = self.video_items[source_video_index]
         return source_video_item
-
-    def find_crop_norm_ratio(self, source_coeff, target_coeffs):
-        alpha = 0.3
-        exp_diff = np.mean(np.abs(target_coeffs[:,80:144] - source_coeff[:,80:144]), 1)
-        angle_diff = np.mean(np.abs(target_coeffs[:,224:227] - source_coeff[:,224:227]), 1)
-        index = np.argmin(alpha*exp_diff + (1-alpha)*angle_diff)
-        crop_norm_ratio = source_coeff[:,-3] / target_coeffs[index:index+1, -3]
-        return crop_norm_ratio
-   
-    def transform_semantic(self, semantic, frame_index, crop_norm_ratio):
-        index = self.obtain_seq_index(frame_index, semantic.shape[0])
-        coeff_3dmm = semantic[index,...]
-        id_coeff = coeff_3dmm[:,:80] #identity
-        ex_coeff = coeff_3dmm[:,80:144] #expression
-        tex_coeff = coeff_3dmm[:,144:224] #texture
-        angles = coeff_3dmm[:,224:227] #euler angles for pose
-        gamma = coeff_3dmm[:,227:254] #lighting
-        translation = coeff_3dmm[:,254:257] #translation
-        crop = coeff_3dmm[:,257:300] #crop param
-
-        if self.cross_id and self.norm_crop_param:
-            crop[:, -3] = crop[:, -3] * crop_norm_ratio
-
-        coeff_3dmm = np.concatenate([ex_coeff, angles, translation, crop], 1)
-        coeff_3dmm_all = np.concatenate([id_coeff, ex_coeff, tex_coeff, angles, gamma, translation, crop], 1)
-        return torch.Tensor(coeff_3dmm).permute(1,0), torch.Tensor(coeff_3dmm_all).permute(1,0)
 
     def obtain_name(self, target_name, source_name):
         if not self.cross_id:

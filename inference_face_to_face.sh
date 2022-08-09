@@ -16,5 +16,5 @@ python inference_face_to_face.py \
 --config ./config/face_to_face_HDTF.yaml \
 --name HDTF_face_to_face \
 --no_resume \
---output_dir ./HDTF_result/trainset_fixed_ref_img \
+--output_dir ./HDTF_result/trainset_fixed_ref_img_cross_id \
 --single_gpu
