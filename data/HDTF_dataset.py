@@ -32,7 +32,7 @@ from .face_utils import get_coeff_vector, rescale_mask_V2, get_contour
 
 
 class HDTFDataset(Dataset):
-    def __init__(self, opt) -> None:
+    def __init__(self, opt, is_inference) -> None:
         super().__init__()
 
         self.data_root = opt.data_root
@@ -58,7 +58,6 @@ class HDTFDataset(Dataset):
 
         self.transform = transforms.Compose(
             [
-                transforms.Resize(256),
                 transforms.ToTensor(),
                 transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5), inplace=True),
             ])
@@ -91,7 +90,6 @@ class HDTFDataset(Dataset):
 
         ## Get the 3DMM rendered face image
         index_seq_window = self.get_index_seq_window(int(file_name), video_length)
-        print(index_seq_window)
 
         coeff_3dmm_list, semantic_params_list = [], []
         for i in index_seq_window:
@@ -109,7 +107,6 @@ class HDTFDataset(Dataset):
         curr_face3dmm_params = curr_semantics[:, :257] # (1, 257)
         curr_trans_params = curr_semantics[:, -3:]
 
-
         rendered_image_numpy, mask = self.face_renderer.compute_rendered_face(curr_face3dmm_params, None)
         # get the rescaled_rendered_image (256, 256, 3)
         rescaled_rendered_image = rescale_mask_V2(rendered_image_numpy[0], curr_trans_params[0], original_shape=(512, 512))
@@ -119,8 +116,10 @@ class HDTFDataset(Dataset):
         mask = mask.permute(0, 2, 3, 1).cpu().numpy() * 255 # (B, 224, 224, 1)
         mask = mask.astype(np.uint8)
         rescaled_mask_image = rescale_mask_V2(mask[0], curr_trans_params[0], original_shape=(512, 512))
-        rescaled_mask_image = rescaled_mask_image.resize((256, 256))
         rescaled_mask_image = get_contour(np.array(rescaled_mask_image)[..., 0].astype(np.uint8))
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
+        rescaled_mask_image = cv2.erode(rescaled_mask_image, kernel=kernel, iterations=1)
+
         rendered_face_mask_img_tensor = torch.FloatTensor(np.array(rescaled_mask_image)) / 255.0
         rendered_face_mask_img_tensor = rendered_face_mask_img_tensor[..., None].permute(2, 0, 1) # (1, H, W)
         

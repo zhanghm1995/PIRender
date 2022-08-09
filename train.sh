@@ -27,7 +27,13 @@ fi
 # --single_gpu
 
 
+# ${PYTHON} train.py \
+# --config ./config/face_to_face.yaml \
+# --name face_to_face_vox_l1_loss_new_mask \
+# --single_gpu
+
+## For training HDTF #####
 ${PYTHON} train.py \
---config ./config/face_to_face.yaml \
---name face_to_face_vox_l1_loss_new_mask \
+--config ./config/face_to_face_HDTF.yaml \
+--name HDTF_face_to_face \
 --single_gpu

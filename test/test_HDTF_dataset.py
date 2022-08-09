@@ -32,7 +32,7 @@ def test_HDTFDataset():
     dataset = HDTFDataset(opt)
     print(len(dataset))
 
-    element = dataset[900]
+    element = dataset[2910]
 
     vis_images = []
     for key, value in element.items():
