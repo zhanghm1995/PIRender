@@ -15,6 +15,7 @@ import collections
 import numpy as np
 from PIL import Image
 from io import BytesIO
+from tqdm import tqdm
 import cv2
 import torch
 from torch.nn import functional as F
@@ -60,7 +61,7 @@ class HDTFVideoDataset(HDTFDataset):
             cross_start_index = random.choice(range(cross_video_num_frames - self.fetch_length))
 
         data = defaultdict(list)
-        for frame_index in range(start_index, start_index + self.fetch_length):
+        for frame_index in tqdm(range(start_index, start_index + self.fetch_length)):
             ## Read the source image and source semantics
             source_img_path = osp.join(self.data_root, video_name, "face_image", f"{frame_index:06d}.jpg")
             source_image = Image.open(source_img_path).convert("RGB")

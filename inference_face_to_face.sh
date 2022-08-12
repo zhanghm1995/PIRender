@@ -14,7 +14,7 @@ set -x
 ########## For HDTF dataset inference ##########
 python inference_face_to_face.py \
 --config ./config/face_to_face_HDTF.yaml \
---name HDTF_face_to_face \
+--name HDTF_face_to_face_no_adain \
 --no_resume \
---output_dir ./HDTF_result/trainset_fixed_ref_img_cross_id \
+--output_dir ./HDTF_result/trainset_fixed_ref_img_cross_id_no_adain \
 --single_gpu

@@ -15,6 +15,7 @@ import argparse
 import numpy as np
 from io import BytesIO
 from PIL import Image
+from tqdm import tqdm
 
 import torch
 import torchvision.transforms.functional as F
@@ -43,9 +44,9 @@ def parse_args():
     parser.add_argument('--single_gpu', action='store_true')
     parser.add_argument('--output_dir', type=str)
 
-
     args = parser.parse_args()
     return args
+
 
 def write2video(results_dir, *video_list):
     cat_video=None
@@ -68,6 +69,7 @@ def write2video(results_dir, *video_list):
     for i in range(len(image_array)):
         out.write(image_array[i][:,:,::-1])
     out.release() 
+
 
 if __name__ == '__main__':
     args = parse_args()
@@ -115,7 +117,7 @@ if __name__ == '__main__':
             name = data['video_name']
 
             output_images, gt_images, warp_images = [],[],[]
-            for frame_index in range(len(data['blended_image'])):
+            for frame_index in tqdm(range(len(data['blended_image']))):
                 curr_reference_image = reference_image[frame_index][None].cuda()
                 curr_source_semantic = source_semantic[frame_index][None].cuda()
                 curr_blended_image = blended_image[frame_index][None].cuda()
