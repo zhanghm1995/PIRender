@@ -12,6 +12,9 @@ import cv2
 from PIL import Image
 
 
+kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
+
+
 def get_contour(im):
     contours, hierarchy = cv2.findContours(im.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
@@ -29,6 +32,9 @@ def get_masked_region(mask_img):
     gray = cv2.cvtColor(mask_img, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (3, 3), 0)
     thresh = cv2.adaptiveThreshold(blur, 255, 1, 1, 11, 2)
+
+    thresh = cv2.dilate(thresh, kernel=kernel, iterations=1)
+    thresh = cv2.erode(thresh, kernel=kernel, iterations=1)
 
     contour = get_contour(thresh)
     # contour = cv2.GaussianBlur(contour,(9, 9), 0)

@@ -39,7 +39,6 @@ class HDTFDemoDataset(Dataset):
         ## Get all key frames
         self.data_root = data_root
         self.video_dir = osp.join(self.data_root, video_name)
-        print(self.video_dir)
 
         self.image_paths = sorted(glob(osp.join(self.video_dir, "face_image", "*.jpg")))
 
@@ -64,7 +63,8 @@ class HDTFDemoDataset(Dataset):
 
         data = {}
         ## Read the source image and source semantics
-        source_image_path = osp.join(self.video_dir, "face_image", file_name + ".jpg")
+        # source_image_path = osp.join(self.video_dir, "face_image", file_name + ".jpg")
+        source_image_path = self.image_paths[index]
         source_image = Image.open(source_image_path).convert("RGB")
         source_image = self.transform(source_image)
         data['source_image'] = source_image
@@ -77,11 +77,14 @@ class HDTFDemoDataset(Dataset):
         ## Read the rendered image
         rendered_image_path = pred_3d_face_image_path
         rendered_image = cv2.imread(rendered_image_path)
-        rescaled_mask_image = get_masked_region(rendered_image)
 
         rendered_image = cv2.cvtColor(rendered_image, cv2.COLOR_BGR2RGB)
         rescaled_rendered_image = self.transform(rendered_image)
         
+        rescaled_mask_image = get_masked_region(rendered_image)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
+        rescaled_mask_image = cv2.erode(rescaled_mask_image, kernel=kernel, iterations=1)
+
         rendered_face_mask_img_tensor = torch.FloatTensor(np.array(rescaled_mask_image)) / 255.0
         rendered_face_mask_img_tensor = rendered_face_mask_img_tensor[..., None].permute(2, 0, 1) # (1, H, W)
 

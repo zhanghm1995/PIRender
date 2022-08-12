@@ -27,10 +27,13 @@ class Face2FaceGenerator(nn.Module):
         self, 
         input_image,
         rendered_image,
-        driving_source, 
-        stage=None
+        driving_source=None, 
         ):
         output = {}
-        descriptor = self.mapping_net(driving_source)
+        if driving_source is not None:
+            descriptor = self.mapping_net(driving_source)
+        else:
+            descriptor = None
+
         output['fake_image'] = self.editing_net(input_image, rendered_image, descriptor)
         return output
