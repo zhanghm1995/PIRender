@@ -12,7 +12,7 @@ if [ -d "$ZHM_PATH" -o -d "$YZH_PATH" ]; then
     else
         PYTHON=python
     fi
-    cd /221019051/Research/Face/hififace
+    cd /221019051/Research/Face/PIRender
 fi
 
 # ${PYTHON} -m torch.distributed.launch --nproc_per_node=1 --master_port 12345 train.py \
@@ -35,5 +35,5 @@ fi
 ## For training HDTF #####
 ${PYTHON} train.py \
 --config ./config/face_to_face_HDTF.yaml \
---name HDTF_face_to_face_no_adain \
+--name HDTF_face_to_face_no_adain_mask_augment \
 --single_gpu

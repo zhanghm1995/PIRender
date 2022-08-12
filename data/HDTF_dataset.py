@@ -33,7 +33,7 @@ from .face_utils import get_coeff_vector, rescale_mask_V2, get_contour
 
 
 class HDTFDataset(Dataset):
-    def __init__(self, opt) -> None:
+    def __init__(self, opt, is_inference=None) -> None:
         super().__init__()
 
         self.data_root = opt.data_root
