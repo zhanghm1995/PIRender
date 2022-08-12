@@ -330,6 +330,11 @@ class BaseTrainer(object):
                 self.accu_gen_avg_iter_time = 0
 
         self._end_of_iteration(data, current_epoch, current_iteration)
+        
+        ## Save the image for sanity check in the first two iterations
+        if current_iteration < 2:
+            self.save_image(self._get_save_path('image', 'jpg'), data)
+
         # Save everything to the checkpoint.
         if current_iteration >= self.opt.snapshot_save_start_iter and \
                 current_iteration % self.opt.snapshot_save_iter == 0:

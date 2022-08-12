@@ -5,11 +5,11 @@
 
 distributed: False
 image_to_tensorboard: True
-snapshot_save_iter: 500
+snapshot_save_iter: 1000
 snapshot_save_epoch: 20
 snapshot_save_start_iter: 50
 snapshot_save_start_epoch: 10
-image_save_iter: 1000
+image_save_iter: 50
 max_epoch: 200
 logging_iter: 100
 results_dir: ./eval_results
@@ -59,8 +59,10 @@ gen:
 
 # Data options.
 data:
-    type: data.vox_face_to_face_dataset::VoxFace2FaceDataset
-    path: ./dataset/vox_lmdb
+    type: data.HDTF_dataset::HDTFDataset
+    data_root: ./dataset/HDTF_face3dmmformer
+    split: ./dataset/train_HDTF_face3dmmformer.txt
+    statistics_file: ./dataset/HDTF_face3dmmformer_statistics.txt
     resolution: 256
     semantic_radius: 13
     train:
@@ -71,8 +73,10 @@ data:
       distributed: False
 
 data_demo:
-    type: data.vox_face_to_face_video_dataset::VoxFace2FaceVideoDataset
-    path: ./dataset/vox_lmdb
+    type: data.HDTF_video_dataset::HDTFVideoDataset
+    data_root: ./dataset/HDTF_face3dmmformer
+    split: ./dataset/train_HDTF_face3dmmformer.txt
+    statistics_file: ./dataset/HDTF_face3dmmformer_statistics.txt
     resolution: 256
     semantic_radius: 13
     train:

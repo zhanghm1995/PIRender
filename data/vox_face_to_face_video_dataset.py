@@ -16,6 +16,7 @@ from PIL import Image
 from io import BytesIO
 import cv2
 import torch
+from torch.nn import functional as F
 import torchvision.transforms as transforms
 
 from data.vox_dataset import format_for_lmdb
@@ -31,6 +32,8 @@ class VoxFace2FaceVideoDataset(VoxFace2FaceDataset):
         # whether normalize the crop parameters when performing cross_id reenactments
         # set it as "True" always brings better performance
         self.norm_crop_param = True
+
+        self.use_cross_expression = True
 
     def __len__(self):
         return len(self.video_items)
@@ -50,7 +53,18 @@ class VoxFace2FaceVideoDataset(VoxFace2FaceDataset):
         with self.env.begin(write=False) as txn:
             semantics_key = format_for_lmdb(video_item['video_name'], 'coeff_3dmm')
             semantics_numpy = np.frombuffer(txn.get(semantics_key), dtype=np.float32)
-            semantics_numpy = semantics_numpy.reshape((video_item['num_frame'],-1))
+            semantics_numpy = np.array(semantics_numpy.reshape((video_item['num_frame'],-1)))
+
+            if self.use_cross_expression:
+                video_item2 = self.video_items[self.video_index + 3]
+                semantics_key2 = format_for_lmdb(video_item2['video_name'], 'coeff_3dmm')
+                semantics_numpy2 = np.frombuffer(txn.get(semantics_key2), dtype=np.float32)
+                semantics_numpy2 = semantics_numpy2.reshape((video_item2['num_frame'],-1))
+                
+                if semantics_numpy2.shape[0] < num_frames:
+                    semantics_numpy2 = np.pad(
+                        semantics_numpy2, pad_width=(0, num_frames - semantics_numpy2.shape[0]), mode='edge')
+                    semantics_numpy[:, 80:144] = semantics_numpy2[:, 80:144]
 
             for frame_index in range(num_frames):
                 key = format_for_lmdb(video_item['video_name'], frame_index)
@@ -59,7 +73,9 @@ class VoxFace2FaceVideoDataset(VoxFace2FaceDataset):
                 source_image = self.transform(img1)
                 data['source_image'].append(source_image)
 
-                reference_frame_idx = random.choice(list(range(num_frames)))
+                # reference_frame_idx = random.choice(list(range(num_frames)))
+                reference_frame_idx = 0 # debug: use the fixed reference image
+                
                 key = format_for_lmdb(video_item['video_name'], reference_frame_idx)
                 img_bytes_2 = txn.get(key)
                 img2 = Image.open(BytesIO(img_bytes_2))
@@ -86,7 +102,9 @@ class VoxFace2FaceVideoDataset(VoxFace2FaceDataset):
                 mask = mask.astype(np.uint8)
                 rescaled_mask_image = rescale_mask_V2(mask[0], curr_trans_params[0], original_shape=(256, 256))
                 rescaled_mask_image = get_contour(np.array(rescaled_mask_image)[..., 0].astype(np.uint8))
-                rescaled_mask_image = cv2.GaussianBlur(rescaled_mask_image, (21, 21), 21)[..., None]
+                kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
+                rescaled_mask_image = cv2.erode(rescaled_mask_image, kernel=kernel, iterations=1)[..., None]
+                # rescaled_mask_image = cv2.GaussianBlur(rescaled_mask_image, (21, 21), 21)[..., None]
                 # rescaled_mask_image = transforms.functional.gaussian_blur(rescaled_mask_image, kernel_size=(11, 11))
 
                 rendered_face_mask_img_tensor = torch.FloatTensor(np.array(rescaled_mask_image)) / 255.0

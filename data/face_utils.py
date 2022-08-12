@@ -12,14 +12,12 @@ import cv2
 from PIL import Image
 
 
+kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
+
+
 def get_contour(im):
     contours, hierarchy = cv2.findContours(im.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-
     out = np.zeros_like(im)
-    # On this output, draw all of the contours that we have detected
-    # in white, and set the thickness to be 3 pixels
-    # cv2.drawContours(out, contours, -1, 255, 3)
-
     out = cv2.fillPoly(out, contours, 255)
 
     return out
@@ -29,6 +27,9 @@ def get_masked_region(mask_img):
     gray = cv2.cvtColor(mask_img, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (3, 3), 0)
     thresh = cv2.adaptiveThreshold(blur, 255, 1, 1, 11, 2)
+
+    thresh = cv2.dilate(thresh, kernel=kernel, iterations=1)
+    thresh = cv2.erode(thresh, kernel=kernel, iterations=1)
 
     contour = get_contour(thresh)
     # contour = cv2.GaussianBlur(contour,(9, 9), 0)
@@ -62,3 +63,29 @@ def rescale_mask_V2(input_mask: np.array, transform_params: list, original_shape
     uncropped_and_rescaled_mask = mask_scaled.resize((original_image_width, original_image_height), 
                                                       resample=Image.Resampling.BICUBIC)
     return uncropped_and_rescaled_mask
+
+
+def get_coeff_vector(face_params_dict, key_list=None, reset_list=None):
+    """Get coefficient vector from Deep3DFace_Pytorch results
+
+    Args:
+        face_params_dict (dict): the dictionary contains reconstructed 3D face
+
+    Returns:
+        [np.ndarray]: 1x257
+    """
+    if key_list is None:
+        keys_list = ['id', 'exp', 'tex', 'angle', 'gamma', 'trans']
+    else:
+        keys_list = key_list
+
+    coeff_list = []
+    for key in keys_list:
+        if reset_list is not None and key in reset_list:
+            value = np.zeros_like(face_params_dict[key])
+            coeff_list.append(value)
+        else:
+            coeff_list.append(face_params_dict[key])
+    
+    coeff_res = np.concatenate(coeff_list, axis=1)
+    return coeff_res
