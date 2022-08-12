@@ -17,12 +17,7 @@ kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11))
 
 def get_contour(im):
     contours, hierarchy = cv2.findContours(im.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-
     out = np.zeros_like(im)
-    # On this output, draw all of the contours that we have detected
-    # in white, and set the thickness to be 3 pixels
-    # cv2.drawContours(out, contours, -1, 255, 3)
-
     out = cv2.fillPoly(out, contours, 255)
 
     return out

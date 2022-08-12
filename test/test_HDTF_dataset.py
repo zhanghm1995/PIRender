@@ -85,5 +85,5 @@ def test_HDTFDemoDataset():
 
 
 if __name__ == "__main__":
-    test_HDTFDemoDataset()
+    test_HDTFDataset()
     print("Done")
