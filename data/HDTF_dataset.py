@@ -64,6 +64,9 @@ class HDTFDataset(Dataset):
             ])
         
         self.face_renderer = MyMeshRender()
+
+        self.half_mask = np.zeros((224, 224, 1), dtype=np.uint8)
+        self.half_mask[:128, ...] = 255
         
     def __len__(self):
         return len(self.file_paths)
@@ -115,15 +118,7 @@ class HDTFDataset(Dataset):
         data['rendered_image'] = self.transform(rescaled_rendered_image)
 
         ## get the rescaled mask image
-        # mask = mask.permute(0, 2, 3, 1).cpu().numpy() * 255 # (B, 224, 224, 1)
-        # mask = mask.astype(np.uint8)
-        # rescaled_mask_image = rescale_mask_V2(mask[0], curr_trans_params[0], original_shape=(512, 512))
-        # rescaled_mask_image = get_contour(np.array(rescaled_mask_image)[..., 0].astype(np.uint8))
-        # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
-        # rescaled_mask_image = cv2.erode(rescaled_mask_image, kernel=kernel, iterations=1)
-
-        # rendered_face_mask_img_tensor = torch.FloatTensor(np.array(rescaled_mask_image)) / 255.0
-        rendered_face_mask_img_tensor = self.get_rescaled_mask(mask, curr_trans_params)
+        rendered_face_mask_img_tensor = self.get_rescaled_mask(mask, curr_trans_params, mask_augment=True)
         
         ## Get the blended face image
         blended_img_tensor = data['source_image'] * (1 - rendered_face_mask_img_tensor) + \
@@ -133,14 +128,30 @@ class HDTFDataset(Dataset):
 
         return data
 
-    def get_rescaled_mask(self, mask: Tensor, trans_params):
+    def get_rescaled_mask(self, mask: Tensor, trans_params, mask_augment=False):
         mask = mask.permute(0, 2, 3, 1).cpu().numpy() * 255 # (B, 224, 224, 1)
         mask = mask.astype(np.uint8)
         
-        rescaled_mask_image = rescale_mask_V2(mask[0], trans_params[0], original_shape=(512, 512))
-        rescaled_mask_image = get_contour(np.array(rescaled_mask_image)[..., 0].astype(np.uint8))
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
-        rescaled_mask_image = cv2.erode(rescaled_mask_image, kernel=kernel, iterations=1)
+        if mask_augment:
+            ## 1) Remove the mouth hole
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
+            closing = cv2.morphologyEx(mask[0], cv2.MORPH_CLOSE, kernel)
+
+            ## 2) Dilate the mask
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 21))
+            img_dialate = cv2.dilate(closing, kernel=kernel, iterations=1)
+
+            img_dialate_half = cv2.bitwise_and(img_dialate, 255 - self.half_mask)
+            closing_half = cv2.bitwise_and(closing, self.half_mask)
+            combined_mask = cv2.bitwise_or(img_dialate_half, closing_half)
+            
+            rescaled_mask_image = rescale_mask_V2(combined_mask[..., None], trans_params[0], original_shape=(512, 512))
+            rescaled_mask_image = np.array(rescaled_mask_image)[..., 0] # to (512, 512)
+        else:
+            rescaled_mask_image = rescale_mask_V2(mask[0], trans_params[0], original_shape=(512, 512))
+            rescaled_mask_image = get_contour(np.array(rescaled_mask_image)[..., 0].astype(np.uint8))
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
+            rescaled_mask_image = cv2.erode(rescaled_mask_image, kernel=kernel, iterations=1)
 
         rendered_face_mask_img_tensor = torch.FloatTensor(np.array(rescaled_mask_image)) / 255.0
         rendered_face_mask_img_tensor = rendered_face_mask_img_tensor[..., None].permute(2, 0, 1) # (1, H, W)
