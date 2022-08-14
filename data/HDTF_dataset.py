@@ -67,6 +67,9 @@ class HDTFDataset(Dataset):
 
         self.half_mask = np.zeros((224, 224, 1), dtype=np.uint8)
         self.half_mask[:128, ...] = 255
+
+        self.closing_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
+        self.dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 31))
         
     def __len__(self):
         return len(self.file_paths)
@@ -134,12 +137,10 @@ class HDTFDataset(Dataset):
         
         if mask_augment:
             ## 1) Remove the mouth hole
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
-            closing = cv2.morphologyEx(mask[0], cv2.MORPH_CLOSE, kernel)
+            closing = cv2.morphologyEx(mask[0], cv2.MORPH_CLOSE, self.closing_kernel)
 
             ## 2) Dilate the mask
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 21))
-            img_dialate = cv2.dilate(closing, kernel=kernel, iterations=1)
+            img_dialate = cv2.dilate(closing, kernel=self.dilate_kernel, iterations=1)
 
             img_dialate_half = cv2.bitwise_and(img_dialate, 255 - self.half_mask)
             closing_half = cv2.bitwise_and(closing, self.half_mask)
