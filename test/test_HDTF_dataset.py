@@ -18,6 +18,29 @@ import torchvision
 import numpy as np
 from easydict import EasyDict
 import torchvision
+import time
+from tqdm import tqdm
+
+
+def profile_HDTFDataset():
+    from data.HDTF_dataset import HDTFDataset
+    print(f"profile_HDTFDataset")
+
+    opt = EasyDict()
+    opt.data_root = "./dataset/HDTF_face3dmmformer"
+    opt.semantic_radius = 13
+    opt.split = "./dataset/train_HDTF_face3dmmformer.txt"
+    opt.statistics_file = "./dataset/HDTF_face3dmmformer_statistics.txt"
+
+    dataset = HDTFDataset(opt)
+    print(len(dataset))
+
+    start = time.time()
+    for i in tqdm(range(10)):
+        element = dataset[i]
+        print(i)
+    end = time.time()
+    print(f"elapsed time is {end - start}, and mean time is {(end - start) / 10}")
 
 
 def test_HDTFDataset():
@@ -85,5 +108,5 @@ def test_HDTFDemoDataset():
 
 
 if __name__ == "__main__":
-    test_HDTFDataset()
+    profile_HDTFDataset()
     print("Done")
