@@ -121,22 +121,24 @@ if __name__ == '__main__':
     os.makedirs(save_dir, exist_ok=True)
 
     ## Build dataset
-    config = EasyDict()
-    config.data_root = "./dataset/HDTF_face3dmmformer/val"
-    config.video_name = "WRA_KellyAyotte_000"
-    config.pred_dir = "/home/zhanghm/Research/V100/TalkingFaceFormer/test_dir/demo_audio_kanghui_PPE"
-    dataset = HDTFDemoDataset(**config)
+    # config = EasyDict()
+    # config.data_root = "./dataset/HDTF_face3dmmformer/val"
+    # config.video_name = "WDA_JeanneShaheen0_000"
+    # config.pred_dir = "/home/zhanghm/Research/Face/PIRender/WDA_JeanneShaheen0_000_condition_WDA_ChrisMurphy0_000"
+    # config.pred_dir = "./dataset/HDTF_face3dmmformer/train/WDA_KimSchrier_000/deep3dface"
+
+    dataset = HDTFDemoDataset(**opt.hdtf_data_demo)
 
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=8,
         shuffle=False,
-        num_workers=8)
+        num_workers=0)
     print(f"The dataset length is {len(dataset)}, The dataloader length is {len(dataloader)}")
     
     ## Start inference
     with torch.no_grad():
-        count = 0
+        count = 6600
         for data in tqdm(dataloader):
             for key, value in data.items():
                 data[key] = value.cuda()
@@ -147,6 +149,7 @@ if __name__ == '__main__':
             output_dict = net_G(reference_image, blended_image)
             output_images = output_dict['fake_image'].cpu().clamp_(-1, 1)
             # output_images = data['masked_image'].cpu()
+            # output_images = data['blended_image'].cpu()
 
             ## Save images
             save_images(save_dir, output_images, count)
