@@ -57,6 +57,7 @@ class HDTFDataset(Dataset):
         self.dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 31))
 
         self.blend_image_ablation = True
+        self.return_coeff_params = True # only return the coeffients not do renderer in dataloader
 
     def _build_dataset(self, opt, is_inference):
         def load_data_statistics(fp):
@@ -85,7 +86,6 @@ class HDTFDataset(Dataset):
             
             ## Get all key frames
             val_split = opt.split.replace("train", "val")
-            print(val_split)
             self.file_paths = open(val_split).read().splitlines()
 
             self.video_frame_length_dict = load_data_statistics(
@@ -123,26 +123,29 @@ class HDTFDataset(Dataset):
 
         ## Get the rendered face image
         curr_semantics = torch.from_numpy(source_coeff_3dmm_all)
-        curr_face3dmm_params = curr_semantics[:, :257] # (1, 257)
-        curr_trans_params = curr_semantics[:, -3:]
-
-        rendered_image_numpy, mask = self.face_renderer.compute_rendered_face(curr_face3dmm_params, None)
-        # get the rescaled_rendered_image (256, 256, 3)
-        rescaled_rendered_image = rescale_mask_V2(
-            rendered_image_numpy[0], curr_trans_params[0], original_shape=(512, 512))
-        data['rendered_image'] = self.transform(rescaled_rendered_image)
-
-        if not self.blend_image_ablation:
-            ## get the rescaled mask image
-            rendered_face_mask_img_tensor = self.get_rescaled_mask(mask, curr_trans_params, mask_augment=True)
-            
-            ## Get the blended face image
-            blended_img_tensor = data['source_image'] * (1 - rendered_face_mask_img_tensor) + \
-                                data['rendered_image'] * rendered_face_mask_img_tensor
+        if self.return_coeff_params:
+            data['source_coeff_3dmm_all'] = curr_semantics
         else:
-            blended_img_tensor = data['rendered_image']
+            curr_face3dmm_params = curr_semantics[:, :257] # (1, 257)
+            curr_trans_params = curr_semantics[:, -3:]
 
-        data['blended_image'] = blended_img_tensor
+            rendered_image_numpy, mask = self.face_renderer.compute_rendered_face(curr_face3dmm_params, None)
+            # get the rescaled_rendered_image (256, 256, 3)
+            rescaled_rendered_image = rescale_mask_V2(
+                rendered_image_numpy[0], curr_trans_params[0], original_shape=(512, 512))
+            data['rendered_image'] = self.transform(rescaled_rendered_image)
+
+            if not self.blend_image_ablation:
+                ## get the rescaled mask image
+                rendered_face_mask_img_tensor = self.get_rescaled_mask(mask, curr_trans_params, mask_augment=True)
+                
+                ## Get the blended face image
+                blended_img_tensor = data['source_image'] * (1 - rendered_face_mask_img_tensor) + \
+                                    data['rendered_image'] * rendered_face_mask_img_tensor
+            else:
+                blended_img_tensor = data['rendered_image']
+
+            data['blended_image'] = blended_img_tensor
 
         return data
 

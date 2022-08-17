@@ -35,5 +35,5 @@ fi
 ## For training HDTF #####
 ${PYTHON} train.py \
 --config ./config/face_to_face_HDTF.yaml \
---name ablation_HDTF_face_to_face_wo_blended_img \
+--name debug \
 --single_gpu

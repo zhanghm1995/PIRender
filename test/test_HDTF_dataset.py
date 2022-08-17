@@ -34,11 +34,48 @@ def profile_HDTFDataset():
 
     dataset = HDTFDataset(opt, is_inference=True)
     print(len(dataset))
+    start = time.time()
+    entry = dataset[10]
+    end = time.time()
+    print(f"time is {end - start}...")
+    exit(0)
 
     start = time.time()
     for i in tqdm(range(10)):
         element = dataset[i]
         print(i)
+    end = time.time()
+    print(f"elapsed time is {end - start}, and mean time is {(end - start) / 10}")
+
+
+def profile_HDTFDataLoader():
+    from data.HDTF_dataset import HDTFDataset
+    print("profile_HDTFDataLoader")
+
+    opt = EasyDict()
+    opt.data_root = "./dataset/HDTF_face3dmmformer"
+    opt.semantic_radius = 13
+    opt.split = "./dataset/train_HDTF_face3dmmformer.txt"
+    opt.statistics_file = "./dataset/HDTF_face3dmmformer_statistics.txt"
+
+    dataset = HDTFDataset(opt, is_inference=True)
+
+    dataloader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=10,
+        shuffle=True,
+        drop_last=True,
+        num_workers=8)
+
+    print(len(dataloader))
+
+    start = time.time()
+    i = -1
+    for element in tqdm(dataloader):
+        i += 1
+        print(i)
+        if i > 10:
+            break
     end = time.time()
     print(f"elapsed time is {end - start}, and mean time is {(end - start) / 10}")
 
@@ -108,5 +145,5 @@ def test_HDTFDemoDataset():
 
 
 if __name__ == "__main__":
-    profile_HDTFDataset()
+    profile_HDTFDataLoader()
     print("Done")

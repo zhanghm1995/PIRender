@@ -124,6 +124,9 @@ class Face2FaceTrainer(BaseTrainer):
 
         i = 0
         for data in data_loader:
+            for key, value in data.items():
+                data[key] = value.to(torch.device("cuda"))
+
             vis_images = self._inference(data)
             
             if vis_images is not None:

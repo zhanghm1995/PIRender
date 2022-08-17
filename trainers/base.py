@@ -393,10 +393,8 @@ class BaseTrainer(object):
             self.write_metrics(data)
         
         ## Evaluate the model
-        if self.current_epoch % self.opt.eval_epoch == 0 and \
-                self.current_epoch >= self.opt.start_eval_epoch:
+        if self.current_epoch >= 1:
             self.eval(val_dataset)
-        
 
     def eval(self, val_dataset):
         output_dir = os.path.join(
