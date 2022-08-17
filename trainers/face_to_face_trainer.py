@@ -7,9 +7,12 @@ Email: haimingzhang@link.cuhk.edu.cn
 Description: 
 '''
 import math
+import os
+import os.path as osp
 
 import torch
 import torch.nn as nn
+import torchvision
 
 from trainers.base import BaseTrainer
 from util.trainer import accumulate, get_optimizer
@@ -98,8 +101,44 @@ class Face2FaceTrainer(BaseTrainer):
             sample = torch.cat([rendered_image, blended_image, reference_image, fake_img, gt_image], dim=3)
         return sample
 
+    def _inference(self, input_dict):
+        blended_image, reference_image = input_dict['blended_image'], input_dict['reference_image']
+        rendered_image = input_dict['rendered_image']
+        source_semantic = None
+        # source_semantic = data['source_semantics']
+
+        gt_image = input_dict['source_image']
+        
+        with torch.no_grad():
+            self.net_G_ema.eval()
+            output_dict = self.net_G_ema(
+                reference_image, blended_image, source_semantic)
+            fake_img = output_dict['fake_image'] # (B, 3, H, W)
+
+            sample = torch.cat([rendered_image, blended_image, reference_image, fake_img, gt_image], dim=3)
+        return sample
+
     def test(self, data_loader, output_dir, current_iteration=-1):
-        pass
+        # NOTE: we just validate part of data for saving time
+        print('Save testing output images to {}'.format(output_dir))
+
+        i = 0
+        for data in data_loader:
+            vis_images = self._inference(data)
+            
+            if vis_images is not None:
+                vis_images = (vis_images + 1) / 2
+                path = osp.join(output_dir, f"index_{i:04d}.jpg")
+                vis_images.clamp_(0, 1)
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                
+                image_grid = torchvision.utils.make_grid(
+                    vis_images, nrow=1, padding=0, normalize=False)
+                torchvision.utils.save_image(image_grid, path, nrow=1)
+
+            i += 1
+            if i > 5:
+                break
 
     def _compute_metrics(self, data, current_iteration):
         blended_image, reference_image = data['blended_image'], data['reference_image']

@@ -59,15 +59,20 @@ if __name__ == '__main__':
     if args.debug:
         trainer.test_everything(train_dataset, val_dataset, current_epoch, current_iteration)
         exit()
+    
     # Start training.
     for epoch in range(current_epoch, opt.max_epoch):
         print('Epoch {} ...'.format(epoch))
+
         if not args.single_gpu:
             train_dataset.sampler.set_epoch(current_epoch)
+        
         trainer.start_of_epoch(current_epoch)
+        
         for it, data in tqdm(enumerate(train_dataset), total=len(train_dataset)):
             data = trainer.start_of_iteration(data, current_iteration)
             trainer.optimize_parameters(data)
+            
             current_iteration += 1
             trainer.end_of_iteration(data, current_epoch, current_iteration)
  

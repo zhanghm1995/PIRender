@@ -384,26 +384,27 @@ class BaseTrainer(object):
                                                      elapsed_epoch_time))
         self.time_epoch = elapsed_epoch_time
         self._end_of_epoch(data, current_epoch, current_iteration)
+        
         # Save everything to the checkpoint.
         if current_epoch >= self.opt.snapshot_save_start_epoch and \
                 current_epoch % self.opt.snapshot_save_epoch == 0:
             self.save_image(self._get_save_path('image', 'jpg'), data)
             self.save_checkpoint(current_epoch, current_iteration)
             self.write_metrics(data)
-        if self.current_epoch % self.opt.eval_epoch == 0 and self.current_epoch >= self.opt.start_eval_epoch:
+        
+        ## Evaluate the model
+        if self.current_epoch % self.opt.eval_epoch == 0 and \
+                self.current_epoch >= self.opt.start_eval_epoch:
             self.eval(val_dataset)
         
 
-    # def eval(self, val_dataset):
-    #     output_dir = os.path.join(
-    #         self.opt.logdir, 'evaluation',
-    #         'epoch_{:05}_iteration_{:09}'.format(self.current_epoch, self.current_iteration)
-    #         )        
-    #     os.makedirs(output_dir, exist_ok=True)
-    #     lpips = self.test(val_dataset, output_dir, self.current_iteration)
-    #     self.write_data_tensorboard({'test_lpips': lpips.mean()},
-    #                                 self.current_epoch, self.current_iteration)
-            
+    def eval(self, val_dataset):
+        output_dir = os.path.join(
+            self.opt.logdir, 'evaluation',
+            'epoch_{:05}_iteration_{:09}'.format(self.current_epoch, self.current_iteration)
+            )        
+        os.makedirs(output_dir, exist_ok=True)
+        self.test(val_dataset, output_dir, self.current_iteration)
 
     def write_data_tensorboard(self, data, epoch, iteration):
         for name, value in data.items():
