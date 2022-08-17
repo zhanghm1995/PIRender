@@ -33,29 +33,14 @@ from .face_utils import get_coeff_vector, rescale_mask_V2, get_contour
 
 
 class HDTFDataset(Dataset):
-    def __init__(self, opt, is_inference=None) -> None:
+    def __init__(self, opt, is_inference=False) -> None:
         super().__init__()
 
         self.data_root = opt.data_root
         self.semantic_radius = opt.semantic_radius
+        self.is_inference = is_inference
 
-        if "train" in opt.split:
-            self.data_root = osp.join(self.data_root, "train")
-
-        ## Get all key frames
-        self.file_paths = open(opt.split).read().splitlines()
-
-        self.video_name_to_imgs_list_dict = defaultdict(list)
-        for line in self.file_paths:
-            name = line.split('/')[0]
-            self.video_name_to_imgs_list_dict[name].append(line)
-
-        ## Read the frames number statistics information
-        lines = open(opt.statistics_file).read().splitlines()
-        self.video_frame_length_dict = {}
-        for line in lines:
-            entry = line.strip().split(' ')
-            self.video_frame_length_dict[entry[0]] = int(entry[1])
+        self._build_dataset(opt, is_inference)
 
         self.transform = transforms.Compose(
             [
@@ -72,7 +57,40 @@ class HDTFDataset(Dataset):
         self.dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 31))
 
         self.blend_image_ablation = True
-        
+
+    def _build_dataset(self, opt, is_inference):
+        def load_data_statistics(fp):
+            lines = open(fp).read().splitlines()
+            ret_dict = {}
+            for line in lines:
+                entry = line.strip().split(' ')
+                ret_dict[entry[0]] = int(entry[1])
+            return ret_dict
+
+        if not is_inference:
+            self.data_root = osp.join(self.data_root, "train")
+
+            ## Get all key frames
+            self.file_paths = open(opt.split).read().splitlines()
+
+            self.video_name_to_imgs_list_dict = defaultdict(list)
+            for line in self.file_paths:
+                name = line.split('/')[0]
+                self.video_name_to_imgs_list_dict[name].append(line)
+
+            ## Read the frames number statistics information
+            self.video_frame_length_dict = load_data_statistics(opt.statistics_file)
+        else:
+            self.data_root = osp.join(self.data_root, "val")
+            
+            ## Get all key frames
+            val_split = opt.split.replace("train", "val")
+            print(val_split)
+            self.file_paths = open(val_split).read().splitlines()
+
+            self.video_frame_length_dict = load_data_statistics(
+                "./dataset/val_HDTF_face3dmmformer_statistics.txt")
+
     def __len__(self):
         return len(self.file_paths)
     
@@ -94,6 +112,8 @@ class HDTFDataset(Dataset):
         video_length = self.video_frame_length_dict[video_name]
 
         ref_img_idx = random.choice(range(video_length))
+        if self.is_inference:
+            ref_img_idx += 6600
         reference_image = Image.open(osp.join(self.data_root, img_dir, f"{ref_img_idx:06d}.jpg")).convert("RGB")
         data['reference_image'] = self.transform(reference_image)
 
@@ -222,21 +242,6 @@ class HDTFDataset(Dataset):
         semantic_params = get_coeff_vector(file_mat, key_list=['exp', 'angle', 'trans'])
         semantic_params = np.concatenate([semantic_params, crop_param], 1) # (1, 73)
         return semantic_params, coeff_3dmm_all
-
-    def _build_dataset(self):
-        self.total_frames_list = []
-        self.length_token_list = [] # increamental length list
-        self.all_videos_dir = []
-
-        total_length = 0
-        for video_name, all_imgs_list in self.video_name_to_imgs_list_dict.items():
-            self.all_videos_dir.append(video_name)
-
-            num_frames = len(all_imgs_list)
-            self.total_frames_list.append(num_frames)
-
-            total_length += num_frames
-            self.length_token_list.append(total_length)
 
     def get_index_seq_window(self, index, num_frames):
         seq = list(range(index - self.semantic_radius, index + self.semantic_radius + 1))

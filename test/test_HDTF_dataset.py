@@ -32,7 +32,7 @@ def profile_HDTFDataset():
     opt.split = "./dataset/train_HDTF_face3dmmformer.txt"
     opt.statistics_file = "./dataset/HDTF_face3dmmformer_statistics.txt"
 
-    dataset = HDTFDataset(opt)
+    dataset = HDTFDataset(opt, is_inference=True)
     print(len(dataset))
 
     start = time.time()
