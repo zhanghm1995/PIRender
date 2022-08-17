@@ -121,12 +121,6 @@ if __name__ == '__main__':
     os.makedirs(save_dir, exist_ok=True)
 
     ## Build dataset
-    # config = EasyDict()
-    # config.data_root = "./dataset/HDTF_face3dmmformer/val"
-    # config.video_name = "WDA_JeanneShaheen0_000"
-    # config.pred_dir = "/home/zhanghm/Research/Face/PIRender/WDA_JeanneShaheen0_000_condition_WDA_ChrisMurphy0_000"
-    # config.pred_dir = "./dataset/HDTF_face3dmmformer/train/WDA_KimSchrier_000/deep3dface"
-
     dataset = HDTFDemoDataset(**opt.hdtf_data_demo)
 
     dataloader = torch.utils.data.DataLoader(

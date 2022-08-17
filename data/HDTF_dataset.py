@@ -4,7 +4,7 @@ Copyright (c) 2022 by Haiming Zhang. All Rights Reserved.
 Author: Haiming Zhang
 Date: 2022-08-07 22:47:08
 Email: haimingzhang@link.cuhk.edu.cn
-Description: The dataset class for loading HDTF dataset.
+Description: The dataset class for loading HDTF dataset for training.
 '''
 
 import os
@@ -70,11 +70,63 @@ class HDTFDataset(Dataset):
 
         self.closing_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
         self.dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 31))
+
+        self.blend_image_ablation = True
         
     def __len__(self):
         return len(self.file_paths)
     
     def __getitem__(self, index: int):
+        data = {}
+
+        ## Get the video name
+        file_path = self.file_paths[index]
+
+        img_dir, file_name = osp.split(file_path)
+        video_name = osp.dirname(img_dir)
+
+        ## Read the source image and source semantics
+        source_img_path = osp.join(self.data_root, file_path + ".jpg")
+        source_image = Image.open(source_img_path).convert("RGB")
+        data['source_image'] = self.transform(source_image)
+
+        ## Read arbitrary reference image
+        video_length = self.video_frame_length_dict[video_name]
+
+        ref_img_idx = random.choice(range(video_length))
+        reference_image = Image.open(osp.join(self.data_root, img_dir, f"{ref_img_idx:06d}.jpg")).convert("RGB")
+        data['reference_image'] = self.transform(reference_image)
+
+        ## Get the 3DMM rendered face image
+        source_mat_fp = osp.join(self.data_root, video_name, "deep3dface", f"{file_name}.mat")
+        source_semantic_params, source_coeff_3dmm_all = self.read_face3dmm_params(source_mat_fp)
+
+        ## Get the rendered face image
+        curr_semantics = torch.from_numpy(source_coeff_3dmm_all)
+        curr_face3dmm_params = curr_semantics[:, :257] # (1, 257)
+        curr_trans_params = curr_semantics[:, -3:]
+
+        rendered_image_numpy, mask = self.face_renderer.compute_rendered_face(curr_face3dmm_params, None)
+        # get the rescaled_rendered_image (256, 256, 3)
+        rescaled_rendered_image = rescale_mask_V2(
+            rendered_image_numpy[0], curr_trans_params[0], original_shape=(512, 512))
+        data['rendered_image'] = self.transform(rescaled_rendered_image)
+
+        if not self.blend_image_ablation:
+            ## get the rescaled mask image
+            rendered_face_mask_img_tensor = self.get_rescaled_mask(mask, curr_trans_params, mask_augment=True)
+            
+            ## Get the blended face image
+            blended_img_tensor = data['source_image'] * (1 - rendered_face_mask_img_tensor) + \
+                                data['rendered_image'] * rendered_face_mask_img_tensor
+        else:
+            blended_img_tensor = data['rendered_image']
+
+        data['blended_image'] = blended_img_tensor
+
+        return data
+
+    def __getitem_with_AdaIN__(self, index: int):
         data = {}
 
         ## Get the video name
@@ -164,11 +216,11 @@ class HDTFDataset(Dataset):
         crop_param = file_mat['transform_params']
         _, _, ratio, t0, t1 = np.hsplit(crop_param.astype(np.float32), 5)
         crop_param = np.concatenate([ratio, t0, t1], 1)
-        coeff_3dmm_all = np.concatenate([coeff_3dmm, crop_param], 1)
+        coeff_3dmm_all = np.concatenate([coeff_3dmm, crop_param], 1) # (1, 260)
 
         ## get the semantic params
         semantic_params = get_coeff_vector(file_mat, key_list=['exp', 'angle', 'trans'])
-        semantic_params = np.concatenate([semantic_params, crop_param], 1)
+        semantic_params = np.concatenate([semantic_params, crop_param], 1) # (1, 73)
         return semantic_params, coeff_3dmm_all
 
     def _build_dataset(self):
@@ -185,28 +237,6 @@ class HDTFDataset(Dataset):
 
             total_length += num_frames
             self.length_token_list.append(total_length)
-
-    def _get_data(self, index):
-        """Get the seperate index location from the total index
-
-        Args:
-            index (int): index in all avaible sequeneces
-        
-        Returns:
-            main_idx (int): index specifying which video
-            sub_idx (int): index specifying what the start index in this sliced video
-        """
-        def fetch_data(length_list, index):
-            assert index < length_list[-1]
-            temp_idx = np.array(length_list) > index
-            list_idx = np.where(temp_idx==True)[0][0]
-            sub_idx = index
-            if list_idx != 0:
-                sub_idx = index - length_list[list_idx - 1]
-            return list_idx, sub_idx
-
-        main_idx, sub_idx = fetch_data(self.length_token_list, index)
-        return main_idx, sub_idx
 
     def get_index_seq_window(self, index, num_frames):
         seq = list(range(index - self.semantic_radius, index + self.semantic_radius + 1))

@@ -54,7 +54,8 @@ class Face2FaceTrainer(BaseTrainer):
     def optimize_parameters(self, data):
         self.gen_losses = {}
         
-        source_semantic = data['source_semantics']
+        # source_semantic = data['source_semantics']
+        source_semantic = None
         reference_image = data['reference_image']
         blended_image = data['blended_image']
 
@@ -82,7 +83,9 @@ class Face2FaceTrainer(BaseTrainer):
     def _get_visualizations(self, data):
         blended_image, reference_image = data['blended_image'], data['reference_image']
         rendered_image = data['rendered_image']
-        source_semantic = data['source_semantics']
+        source_semantic = None
+        # source_semantic = data['source_semantics']
+
         gt_image = data['source_image']
 
         with torch.no_grad():
@@ -100,7 +103,9 @@ class Face2FaceTrainer(BaseTrainer):
 
     def _compute_metrics(self, data, current_iteration):
         blended_image, reference_image = data['blended_image'], data['reference_image']
-        source_semantic = data['source_semantics']
+        # source_semantic = data['source_semantics']
+        source_semantic = None
+
         gt_image = data['source_image']
 
         metrics = {}
