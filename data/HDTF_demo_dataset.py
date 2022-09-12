@@ -93,7 +93,10 @@ class HDTFDemoDataset(Dataset):
 
         self.image_paths = sorted(glob(osp.join(self.video_dir, "face_image", "*.jpg")))
 
-        self.pred_paths = sorted(glob(osp.join(pred_dir, "*.mat")))
+        self.pred_paths = sorted(glob(osp.join(pred_dir, "*.png")))
+        self.deep3dface_mat_paths = sorted(glob(osp.join(self.video_dir, "deep3dface", "*.mat")))
+
+        self.pred_224_paths = sorted(glob("/home/zhanghm/Temp/cv-fighter/face_fighter/3DMM/paper_PE_val_condition_WDA_KimSchrier_000_001_audio_WRA_KellyAyotte_000/*.png"))
 
         self.transform = transforms.Compose(
             [
@@ -107,12 +110,12 @@ class HDTFDemoDataset(Dataset):
         self.half_mask[:128, ...] = 255
 
         self.closing_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
-        self.dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 15))
+        self.dilate_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 21))
 
     def __len__(self):
         return len(self.pred_paths)
 
-    def __getitem__(self, index):
+    def __getitem_validation__(self, index):
         pred_3d_face_mat_path = self.pred_paths[index]
 
         data = {}
@@ -153,10 +156,56 @@ class HDTFDemoDataset(Dataset):
         
         return data
 
-
-    def __getitem_image__(self, index):
+    def __getitem__(self, index):
         pred_3d_face_image_path = self.pred_paths[index]
-        file_name = osp.basename(pred_3d_face_image_path)[:-4]
+        deep3dface_mat_path = self.deep3dface_mat_paths[index]
+        
+        coeff_3dmm = read_face3dmm_params(deep3dface_mat_path, need_crop_params=True)
+        coeff_3dmm = torch.from_numpy(coeff_3dmm) # (1, 260)
+        curr_face3dmm_params = coeff_3dmm[:, :257] # (1, 257)
+        curr_trans_params = coeff_3dmm[:, -3:]
+
+        data = {}
+        ## Read the source image and source semantics
+        source_image_path = self.image_paths[index]
+        source_image = Image.open(source_image_path).convert("RGB")
+        source_image = self.transform(source_image)
+        data['source_image'] = source_image
+
+        ref_img_idx = 0
+        ref_img_path = self.image_paths[ref_img_idx]
+        reference_image = Image.open(ref_img_path).convert("RGB")
+        data['reference_image'] = self.transform(reference_image)
+
+        ## Read the rendered image
+        rendered_image = cv2.imread(pred_3d_face_image_path)
+        rendered_image = cv2.cvtColor(rendered_image, cv2.COLOR_BGR2RGB)
+        rescaled_rendered_image = self.transform(rendered_image)
+        
+        ## Read the 224 rendered image to get the mask
+        # rendered_224_image = cv2.imread(self.pred_224_paths[index])
+        # mask_image_224 = get_masked_region(rendered_224_image) # (224, 224)
+        # mask_image_224 = torch.FloatTensor(np.array(mask_image_224)) / 255.0
+        # mask_image_224 = mask_image_224[..., None].permute(2, 0, 1) # (1, 224, 224)
+        # mask_image_224 = mask_image_224[None] # (B, 1, 224, 224)
+
+        # # kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
+        # # rescaled_mask_image = cv2.erode(rescaled_mask_image, kernel=kernel, iterations=1)
+        # # rescaled_mask_image = cv2.dilate(rescaled_mask_image, kernel=kernel, iterations=1)
+        # rendered_face_mask_img_tensor = self.get_rescaled_mask(mask_image_224, curr_trans_params, mask_augment=True)
+
+        # blended_img_tensor = source_image * (1 - rendered_face_mask_img_tensor) + \
+        #                      rescaled_rendered_image * rendered_face_mask_img_tensor
+
+        data['rendered_image'] = rescaled_rendered_image
+        # data['masked_image'] = rendered_face_mask_img_tensor.repeat(3, 1, 1)
+        # data['blended_image'] = blended_img_tensor
+        data['blended_image'] = rescaled_rendered_image
+        
+        return data
+
+    def __getitem_origin__(self, index):
+        pred_3d_face_image_path = self.pred_paths[index]
 
         data = {}
         ## Read the source image and source semantics
@@ -197,7 +246,7 @@ class HDTFDemoDataset(Dataset):
         return data
 
     def get_rescaled_mask(self, mask: Tensor, trans_params, mask_augment=False):
-        mask = mask.permute(0, 2, 3, 1).cpu().numpy() * 255 # (B, 224, 224, 1)
+        mask = mask.permute(0, 2, 3, 1).cpu().numpy() * 255 # to (B, 224, 224, 1)
         mask = mask.astype(np.uint8)
         
         if mask_augment:
@@ -216,7 +265,7 @@ class HDTFDemoDataset(Dataset):
         else:
             rescaled_mask_image = rescale_mask_V2(mask[0], trans_params[0], original_shape=(512, 512))
             rescaled_mask_image = get_contour(np.array(rescaled_mask_image)[..., 0].astype(np.uint8))
-            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (21, 21))
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
             rescaled_mask_image = cv2.erode(rescaled_mask_image, kernel=kernel, iterations=1)
 
         rendered_face_mask_img_tensor = torch.FloatTensor(np.array(rescaled_mask_image)) / 255.0

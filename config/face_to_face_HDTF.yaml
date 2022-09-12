@@ -87,7 +87,13 @@ data_demo:
       distributed: False
 
 hdtf_data_demo:
-  data_root: ./dataset/HDTF_face3dmmformer/val
-  video_name: WDA_JeanneShaheen0_000
+  data_root: ./dataset/HDTF_face3dmmformer/train
+  # video_name: WDA_JeanneShaheen0_000
+  # video_name: WRA_KellyAyotte_000
+  # video_name: WDA_ChrisVanHollen1_000
+  # video_name: WDA_ChrisMurphy0_000
+  video_name: WDA_KimSchrier_000
+  # video_name: WDA_JeanneShaheen0_000
   # the deep3dface coeffcients directory path
-  pred_dir: /home/zhanghm/Research/Face/PIRender/WDA_JeanneShaheen0_000_condition_WDA_ChrisMurphy0_000
+  # pred_dir: /home/zhanghm/Research/Face/PIRender/WDA_JeanneShaheen0_000_condition_WDA_ChrisMurphy0_000
+  pred_dir: /home/zhanghm/Research/V100/TalkingFaceFormer/test_dir/paper_PE_val_condition_WDA_KimSchrier_000_001_audio_WRA_KellyAyotte_000

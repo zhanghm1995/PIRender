@@ -17,6 +17,8 @@ import torchvision
 from trainers.base import BaseTrainer
 from util.trainer import accumulate, get_optimizer
 from loss.perceptual  import PerceptualLoss
+from visualizer.render_utils import MyMeshRender
+
 
 class Face2FaceTrainer(BaseTrainer):
     r"""Initialize lambda model trainer.
@@ -35,6 +37,8 @@ class Face2FaceTrainer(BaseTrainer):
         super(Face2FaceTrainer, self).__init__(opt, net_G, opt_G, sch_G, train_data_loader, val_data_loader)
         self.accum = 0.5 ** (32 / (10 * 1000))
         self.log_size = int(math.log(opt.data.resolution, 2))
+
+        self.face_renderer = MyMeshRender()
 
     def _init_loss(self, opt):
         self._assign_criteria(
@@ -82,6 +86,15 @@ class Face2FaceTrainer(BaseTrainer):
         self.opt_G.step()
 
         accumulate(self.net_G_ema, self.net_G_module, self.accum)
+    
+    def create_rendered_image(self, input_dict):
+        curr_semantics = input_dict['source_coeff_3dmm_all']
+        
+        curr_face3dmm_params = curr_semantics[:, :257] # (1, 257)
+        curr_trans_params = curr_semantics[:, -3:]
+
+        rendered_image_numpy, mask = self.face_renderer.compute_rendered_face(curr_face3dmm_params, None)
+
 
     def _get_visualizations(self, data):
         blended_image, reference_image = data['blended_image'], data['reference_image']

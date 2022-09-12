@@ -132,7 +132,7 @@ def test_HDTFDemoDataset():
     data = HDTFDemoDataset(**config)
     print(len(data))
 
-    element = data[0]
+    element = data.__getitem_224__(0)
 
     vis_images = []
     for key, value in element.items():
@@ -145,5 +145,5 @@ def test_HDTFDemoDataset():
 
 
 if __name__ == "__main__":
-    profile_HDTFDataLoader()
+    test_HDTFDemoDataset()
     print("Done")
