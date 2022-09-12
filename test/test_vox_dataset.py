@@ -55,5 +55,21 @@ def test_VoxDataset():
     print(dataset.idx_by_person_id['id10499'])
 
 
+def test_VoxPngDataset():
+    from data.vox_png_dataset import VoxPngDataset
+    config = OmegaConf.load("./config/face_vox_png.yaml")
+
+    dataset = VoxPngDataset(config.data, is_inference=False)
+    print("The length of the dataset is: ", len(dataset))
+
+    print(len(dataset.video_items))
+    print(dataset.idx_by_person_id['id10499'])
+
+    entry = dataset[10]
+    save_image = torch.stack((entry['source_image'], entry['target_image']), dim=0)
+    save_image = denormalize_transform(save_image)
+    torchvision.utils.save_image(save_image, "test_vox.png", padding=0)
+
+
 if __name__ == "__main__":
-    test_VoxDataset()
+    test_VoxPngDataset()
