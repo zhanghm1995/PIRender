@@ -63,9 +63,11 @@ def test_VoxPngDataset():
     print("The length of the dataset is: ", len(dataset))
 
     print(len(dataset.video_items))
-    print(dataset.idx_by_person_id['id10499'])
 
     entry = dataset[10]
+    for key, value in entry.items():
+        print(key, value.shape)
+        
     save_image = torch.stack((entry['source_image'], entry['target_image']), dim=0)
     save_image = denormalize_transform(save_image)
     torchvision.utils.save_image(save_image, "test_vox.png", padding=0)

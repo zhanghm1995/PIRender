@@ -64,18 +64,20 @@ class VoxPngDataset(Dataset):
         person_id = self.person_ids[index]
         video_item = self.video_items[random.choices(self.idx_by_person_id[person_id], k=1)[0]]
         frame_source, frame_target = self.random_select_frames(video_item)
-        print(frame_source, frame_target)
 
         video_images_dir = osp.join(self.data_root, video_item, "face_image")
 
         source_image_path = osp.join(video_images_dir, f"{frame_source:06d}.png")
         img1 = Image.open(source_image_path).convert("RGB")
         data['source_image'] = self.transform(img1)
-        # data['source_semantics'], coeff_3dmm_all = self.transform_semantic(semantics_numpy, frame_source)
 
         target_image_path = osp.join(video_images_dir, f"{frame_target:06d}.png")
         img2 = Image.open(target_image_path).convert("RGB")
         data['target_image'] = self.transform(img2)
+
+        semantics_numpy = np.load(osp.join(self.data_root, video_item, "deep3dface.npy"))
+        data['source_semantics'], _ = self.transform_semantic(semantics_numpy, frame_source)
+        data['target_semantics'], _ = self.transform_semantic(semantics_numpy, frame_target)
 
         return data
 
