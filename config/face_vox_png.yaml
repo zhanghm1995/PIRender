@@ -3,7 +3,7 @@
 #     gen: gen_optimizer
 #     dis: dis_optimizer
 
-distributed: True
+distributed: False
 image_to_tensorboard: True
 snapshot_save_iter: 40000
 snapshot_save_epoch: 20
@@ -69,15 +69,15 @@ gen:
 
 # Data options.
 data:
-    type: data.vox_dataset::VoxPngDataset
+    type: data.vox_png_dataset::VoxPngDataset
     path: ./dataset/vox1_preprocessed
     resolution: 256
     semantic_radius: 13
     train:
       batch_size: 5
-      distributed: True
+      distributed: False
     val:
       batch_size: 8
-      distributed: True
+      distributed: False
 
 

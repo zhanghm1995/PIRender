@@ -37,6 +37,8 @@ if __name__ == '__main__':
         opt.local_rank = args.local_rank
         init_dist(opt.local_rank)    
         opt.device = opt.local_rank
+    else:
+        opt.local_rank = args.local_rank
     opt.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
     # create a visualizer

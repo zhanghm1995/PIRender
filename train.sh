@@ -1,5 +1,3 @@
-set -x
-
 ZHM_PATH="/221019051/"
 YZH_PATH="/221019041/"
 
@@ -15,6 +13,7 @@ if [ -d "$ZHM_PATH" -o -d "$YZH_PATH" ]; then
     cd /221019051/Research/Face/PIRender
 fi
 
+set -x
 # ${PYTHON} -m torch.distributed.launch --nproc_per_node=1 --master_port 12345 train.py \
 # --config ./config/face_ours.yaml \
 # --name face_vox
@@ -34,6 +33,6 @@ fi
 
 ## For training HDTF #####
 ${PYTHON} train.py \
---config ./config/face_to_face_HDTF.yaml \
---name debug \
+--config ./config/face_vox_png.yaml \
+--name face_vox_png \
 --single_gpu
